@@ -309,9 +309,9 @@ inline void getCableDownstreamResources(
     chassis_utils::getChassisAssembly(
         asyncResp, "chassis",
         [asyncResp,
-         cableObjectPath](const std::optional<std::string>& validChassisPath,
+         cableObjectPath](const boost::system::error_code& ec,
                           const std::vector<std::string>& updatedAssemblyList) {
-            if (!validChassisPath || updatedAssemblyList.empty())
+            if (ec)
             {
                 BMCWEB_LOG_DEBUG("Chassis not found");
                 return;

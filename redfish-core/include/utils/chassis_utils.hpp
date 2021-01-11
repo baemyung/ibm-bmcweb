@@ -131,7 +131,7 @@ inline void afterGetChassisAssembly(
 inline void getChassisAssembly(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     const std::string& chassisId,
-    std::function<void(const std::optional<std::string>& validChassisPath,
+    std::function<void(const boost::system::error_code& ec,
                        const std::vector<std::string>& sortedAssemblyList)>&&
         callback)
 {
