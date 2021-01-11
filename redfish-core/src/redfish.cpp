@@ -9,6 +9,7 @@
 #include "aggregation_service.hpp"
 #include "app.hpp"
 #include "assembly.hpp"
+#include "assembly.hpp"
 #include "bios.hpp"
 #include "cable.hpp"
 #include "certificate_service.hpp"
@@ -73,6 +74,8 @@ RedfishService::RedfishService(App& app)
 
     requestAccountServiceRoutes(app);
     requestAccountServiceMFARoutes(app);
+    requestRoutesAssembly(app);
+
     if constexpr (BMCWEB_REDFISH_AGGREGATION)
     {
         requestRoutesAggregationService(app);
@@ -119,7 +122,6 @@ RedfishService::RedfishService(App& app)
     requestRoutesDrive(app);
     requestRoutesCable(app);
     requestRoutesCableCollection(app);
-    requestRoutesAssembly(app);
 
     requestRoutesSystemLogServiceCollection(app);
     requestRoutesEventLogService(app);
