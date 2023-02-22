@@ -105,13 +105,20 @@ inline void addLinkedFabricAdapter(
 inline void doLinkAssociatedDiskBackplaneToChassis(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     const std::string& chassisId, const std::string& drivePath, size_t index,
-    const std::optional<std::string>& validChassisPath,
+    const boost::system::error_code& ec,
     const std::vector<std::string>& assemblyList)
 {
-    if (!validChassisPath || assemblyList.empty())
+    if (ec)
     {
-        BMCWEB_LOG_WARNING("Chassis not found");
-        messages::resourceNotFound(asyncResp->res, "Chassis", chassisId);
+        if (ec.value() == boost::system::errc::io_error)
+        {
+            BMCWEB_LOG_WARNING("Chassis {} not found", chassisId);
+            messages::resourceNotFound(asyncResp->res, "Chassis", chassisId);
+            return;
+        }
+
+        BMCWEB_LOG_ERROR("DBUS response error {}", ec.value());
+        messages::internalError(asyncResp->res);
         return;
     }
 
