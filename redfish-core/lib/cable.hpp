@@ -33,7 +33,6 @@
 #include <cmath>
 #include <functional>
 #include <memory>
-#include <optional>
 #include <ranges>
 #include <string>
 #include <string_view>
@@ -306,16 +305,27 @@ inline void getCableDownstreamResources(
     const std::string& cableObjectPath)
 {
     // retrieve Downstream Resources
+    std::string chassisId{"chassis"};
     chassis_utils::getChassisAssembly(
-        asyncResp, "chassis",
-        [asyncResp,
-         cableObjectPath](const std::optional<std::string>& validChassisPath,
+        asyncResp, chassisId,
+        [asyncResp, chassisId,
+         cableObjectPath](const boost::system::error_code& ec,
                           const std::vector<std::string>& updatedAssemblyList) {
-            if (!validChassisPath || updatedAssemblyList.empty())
+            if (ec)
             {
-                BMCWEB_LOG_DEBUG("Chassis not found");
+                if (ec.value() == boost::system::errc::io_error)
+                {
+                    BMCWEB_LOG_WARNING("Chassis {} not found", chassisId);
+                    messages::resourceNotFound(asyncResp->res, "Chassis",
+                                               chassisId);
+                    return;
+                }
+
+                BMCWEB_LOG_ERROR("DBUS response error {}", ec.value());
+                messages::internalError(asyncResp->res);
                 return;
             }
+
             doGetCableDownstreamResources(asyncResp, cableObjectPath,
                                           updatedAssemblyList);
         });
