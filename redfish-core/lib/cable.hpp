@@ -17,6 +17,7 @@
 #include "utils/chassis_utils.hpp"
 #include "utils/collection.hpp"
 #include "utils/dbus_utils.hpp"
+#include "utils/fabric_util.hpp"
 
 #include <asm-generic/errno.h>
 #include <sys/types.h>
@@ -354,8 +355,9 @@ inline void afterGetCableAssociatedPorts(
         }
 
         // NOTE: adapterId is currently assumed as the parent of port
-        sdbusplus::message::object_path parentPath{path.parent_path()};
-        std::string adapterName = parentPath.filename();
+        std::string parentPath = path.parent_path();
+        std::string adapterName =
+            fabric_util::buildFabricUniquePath(parentPath);
         if (adapterName.empty())
         {
             continue;

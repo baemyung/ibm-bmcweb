@@ -15,8 +15,8 @@
 #include "query.hpp"
 #include "registries/privilege_registry.hpp"
 #include "utils/chassis_utils.hpp"
-#include "utils/collection.hpp"
 #include "utils/dbus_utils.hpp"
+#include "utils/fabric_util.hpp"
 #include "utils/json_utils.hpp"
 #include "utils/name_utils.hpp"
 
@@ -373,9 +373,7 @@ inline void afterGetValidFabricAdapterPath(
 
     for (const auto& [adapterPath, serviceMap] : subtree)
     {
-        std::string fabricAdapterName =
-            sdbusplus::message::object_path(adapterPath).filename();
-        if (fabricAdapterName == adapterId)
+        if (adapterId == fabric_util::buildFabricUniquePath(adapterPath))
         {
             fabricAdapterPath = adapterPath;
             serviceName = serviceMap.begin()->first;
@@ -560,13 +558,8 @@ inline void handleFabricAdapterCollectionGet(
     asyncResp->res.jsonValue["@odata.id"] = boost::urls::format(
         "/redfish/v1/Systems/{}/FabricAdapters", systemName);
 
-    constexpr std::array<std::string_view, 1> interfaces{
-        "xyz.openbmc_project.Inventory.Item.FabricAdapter"};
-    collection_util::getCollectionMembers(
-        asyncResp,
-        boost::urls::format("/redfish/v1/Systems/{}/FabricAdapters",
-                            BMCWEB_REDFISH_SYSTEM_URI_NAME),
-        interfaces, "/xyz/openbmc_project/inventory");
+    fabric_util::getFabricAdapterList(asyncResp,
+                                      nlohmann::json::json_pointer("/Members"));
 }
 
 inline void handleFabricAdapterCollectionHead(
