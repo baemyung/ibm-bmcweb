@@ -74,7 +74,8 @@ class ConsoleHandler : public std::enable_shared_from_this<ConsoleHandler>
             }
             if (ec)
             {
-                BMCWEB_LOG_ERROR << "Error in host serial write " << ec;
+                BMCWEB_LOG_ERROR << "Error in host serial write "
+                                 << ec.message();
                 return;
             }
             self->doWrite();
@@ -117,30 +118,25 @@ class ConsoleHandler : public std::enable_shared_from_this<ConsoleHandler>
         });
     }
 
-    void connect()
+    bool connect(int fd)
     {
-        const std::string consoleName("\0obmc-console", 13);
-        boost::asio::local::stream_protocol::endpoint ep(consoleName);
+        boost::system::error_code ec;
+        boost::asio::local::stream_protocol proto;
 
-        hostSocket.async_connect(ep, [this, weakSelf(weak_from_this())](
-                                         const boost::system::error_code& ec) {
-            std::shared_ptr<ConsoleHandler> self = weakSelf.lock();
-            if (self == nullptr)
-            {
-                return;
-            }
-            if (ec)
-            {
-                BMCWEB_LOG_ERROR << "Failed to call console Connect() method"
-                                 << " DBUS error: " << ec.message();
+        hostSocket.assign(proto, fd, ec);
 
-                conn.close("Internal Error");
-                return;
-            }
+        if (ec)
+        {
+            BMCWEB_LOG_ERROR
+                << "Failed to assign the DBUS socket Socket assign error: "
+                << ec.message();
+            return false;
+        }
 
-            doWrite();
-            doRead();
-        });
+        conn.resumeRead();
+        doWrite();
+        doRead();
+        return true;
     }
 
     boost::asio::local::stream_protocol::socket hostSocket;
@@ -181,25 +177,96 @@ inline void onClose(crow::websocket::Connection& conn, const std::string& err)
     getConsoleHandlerMap().erase(iter);
 }
 
-inline void connectConsoleSocket(crow::websocket::Connection& conn)
+inline void connectConsoleSocket(crow::websocket::Connection& conn,
+                                 const boost::system::error_code& ec,
+                                 const sdbusplus::message::unix_fd& unixfd)
+{
+    if (ec)
+    {
+        BMCWEB_LOG_ERROR
+            << "Failed to call console Connect() method DBUS error: "
+            << ec.message();
+        conn.close("Failed to connect");
+        return;
+    }
+
+    // Look up the handler
+    auto iter = getConsoleHandlerMap().find(&conn);
+    if (iter == getConsoleHandlerMap().end())
+    {
+        BMCWEB_LOG_ERROR << "Connection was already closed";
+        return;
+    }
+
+    int fd = dup(unixfd);
+    if (fd == -1)
+    {
+        BMCWEB_LOG_ERROR << "Failed to dup the DBUS unixfd error: "
+                         << strerror(errno);
+        conn.close("Internal error");
+        return;
+    }
+
+    BMCWEB_LOG_DEBUG << "Console duped FD: " << fd;
+
+    if (!iter->second->connect(fd))
+    {
+        close(fd);
+        conn.close("Internal Error");
+    }
+}
+
+inline void
+    processConsoleObject(crow::websocket::Connection& conn,
+                         const std::string& consoleObjPath,
+                         const boost::system::error_code& ec,
+                         const ::dbus::utility::MapperGetObject& objInfo)
 {
     // Look up the handler
     auto iter = getConsoleHandlerMap().find(&conn);
     if (iter == getConsoleHandlerMap().end())
     {
-        BMCWEB_LOG_ERROR << "Failed to find the handler";
-        conn.close("Internal error");
+        BMCWEB_LOG_ERROR << "Connection was already closed";
         return;
     }
 
-    iter->second->connect();
+    if (ec)
+    {
+        BMCWEB_LOG_WARNING << "getDbusObject() for consoles failed. DBUS error:"
+                           << ec.message();
+        conn.close("getDbusObject() for consoles failed.");
+        return;
+    }
+
+    const auto valueIface = objInfo.begin();
+    if (valueIface == objInfo.end())
+    {
+        BMCWEB_LOG_WARNING << "getDbusObject() returned unexpected size: "
+                           << objInfo.size();
+        conn.close("getDbusObject() returned unexpected size");
+        return;
+    }
+
+    const std::string& consoleService = valueIface->first;
+    BMCWEB_LOG_DEBUG << "Looking up unixFD for Service " << consoleService
+                     << " Path " << consoleObjPath;
+    // Call Connect() method to get the unix FD
+    crow::connections::systemBus->async_method_call(
+        [&conn](const boost::system::error_code& ec1,
+                const sdbusplus::message::unix_fd& unixfd) {
+        connectConsoleSocket(conn, ec1, unixfd);
+    },
+        consoleService, consoleObjPath, "xyz.openbmc_project.Console.Access",
+        "Connect");
 }
 
 // Query consoles from DBUS and find the matching to the
 // rules string.
 inline void onOpen(crow::websocket::Connection& conn)
 {
-    BMCWEB_LOG_DEBUG << "Connection " << &conn << " opened";
+    std::string consoleLeaf;
+
+    BMCWEB_LOG_DEBUG << "Connection " << &conn << " opened ";
 
     if (getConsoleHandlerMap().size() >= maxSessions)
     {
@@ -207,59 +274,40 @@ inline void onOpen(crow::websocket::Connection& conn)
         return;
     }
 
-    // Ensure user has ConfigureManager, setting above does nothing
-    auto getUserInfo =
-        [&conn](const boost::system::error_code& ec,
-                const dbus::utility::DBusPropertiesMap& userInfo) {
-        if (ec)
-        {
-            BMCWEB_LOG_ERROR << "GetUserInfo failed...";
-            conn.close("Failed to get user information");
-            return;
-        }
+    std::shared_ptr<ConsoleHandler> handler =
+        std::make_shared<ConsoleHandler>(conn.getIoContext(), conn);
+    getConsoleHandlerMap().emplace(&conn, handler);
 
-        const std::string* userRolePtr = nullptr;
-        auto userInfoIter = std::find_if(
-            userInfo.begin(), userInfo.end(),
-            [](const auto& p) { return p.first == "UserPrivilege"; });
-        if (userInfoIter != userInfo.end())
-        {
-            userRolePtr = std::get_if<std::string>(&userInfoIter->second);
-        }
+    conn.deferRead();
 
-        std::string userRole{};
-        if (userRolePtr != nullptr)
-        {
-            userRole = *userRolePtr;
-            BMCWEB_LOG_DEBUG << "userName = " << conn.getUserName()
-                             << " userRole = " << *userRolePtr;
-        }
+    // Keep old path for backward compatibility
+    if (conn.url().path() == "/console0")
+    {
+        consoleLeaf = "default";
+    }
+    else
+    {
+        // Get the console id from console router path and prepare the console
+        // object path and console service.
+        consoleLeaf = conn.url().segments().back();
+    }
+    std::string consolePath =
+        sdbusplus::message::object_path("/xyz/openbmc_project/console") /
+        consoleLeaf;
 
-        // Get the user privileges from the role
-        ::redfish::Privileges userPrivileges =
-            ::redfish::getUserPrivileges(userRole);
+    BMCWEB_LOG_DEBUG << "Console Object path = " << consolePath
+                     << " Request target = " << conn.url().path();
 
-        const ::redfish::Privileges requiredPrivileges{"ConfigureManager"};
+    // mapper call lambda
+    constexpr std::array<std::string_view, 1> interfaces = {
+        "xyz.openbmc_project.Console.Access"};
 
-        if (!userPrivileges.isSupersetOf(requiredPrivileges))
-        {
-            BMCWEB_LOG_DEBUG << "User " << conn.getUserName()
-                             << " not authorized for host console connection";
-            conn.close("Unauthorized access");
-            return;
-        }
-
-        std::shared_ptr<ConsoleHandler> handler =
-            std::make_shared<ConsoleHandler>(conn.getIoContext(), conn);
-        getConsoleHandlerMap().emplace(&conn, handler);
-
-        connectConsoleSocket(conn);
-    };
-
-    crow::connections::systemBus->async_method_call(
-        std::move(getUserInfo), "xyz.openbmc_project.User.Manager",
-        "/xyz/openbmc_project/user", "xyz.openbmc_project.User.Manager",
-        "GetUserInfo", conn.getUserName());
+    dbus::utility::getDbusObject(
+        consolePath, interfaces,
+        [&conn, consolePath](const boost::system::error_code& ec,
+                             const ::dbus::utility::MapperGetObject& objInfo) {
+        processConsoleObject(conn, consolePath, ec, objInfo);
+    });
 }
 
 inline void onMessage(crow::websocket::Connection& conn,
