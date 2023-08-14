@@ -1,0 +1,7 @@
+<Configuration sourceCodeOnly="true" staticAnalysisOnly="true">
+  <Targets>
+    <Target outputs-only="false" path=".">
+      <Exclude>*.py</Exclude>
+    </Target>
+  </Targets>
+</Configuration>
