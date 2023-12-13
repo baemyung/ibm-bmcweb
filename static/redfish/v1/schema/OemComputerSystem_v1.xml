@@ -61,7 +61,6 @@
                   <Annotation Term="OData.Description" String="An indication of PEL topology information is saves."/>
                   <Annotation Term="OData.LongDescription" String="This property when set to 'true' saves the topology information. The information is saved in the form of a PEL(Error Log)."/>
                 </Property>
-
             </ComplexType>
 
             <ComplexType Name="OpenBmc" BaseType="Resource.OemObject">
@@ -111,6 +110,27 @@
                   <Annotation Term="OData.Description" String="List of enabled panel functions."/>
                   <Annotation Term="OData.LongDescription" String="This property shall contain the list of enabled panel functions."/>
                 </Property>
+                <Property Name="ChapData" Type="OemComputerSystem.v1_0_0.ChapData">
+                  <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+                  <Annotation Term="OData.Description" String="ChapData."/>
+                  <Annotation Term="OData.LongDescription" String="This property shall contain ChapData."/>
+                </Property>
+            </ComplexType>
+
+            <ComplexType Name="ChapData" BaseType="Resource.OemObject">
+                <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+                <Annotation Term="OData.Description" String="ChapData."/>
+                <Annotation Term="OData.LongDescription" String="This type shall contain ChapData."/>
+                <Property Name="ChapName" Type="Edm.String">
+                  <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+                  <Annotation Term="OData.Description" String="ChapName."/>
+                  <Annotation Term="OData.LongDescription" String="This property shall contain ChapName."/>
+                </Property>
+                <Property Name="ChapSecret" Type="Edm.String">
+                  <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+                  <Annotation Term="OData.Description" String="ChapSecret."/>
+                  <Annotation Term="OData.LongDescription" String="This property shall contain ChapSecret."/>
+                </Property>
             </ComplexType>
 
             <Action Name="ExecutePanelFunction" IsBound="true">
@@ -121,6 +141,7 @@
                     <Annotation Term="OData.LongDescription" String="This parameter shall contain a  panel function number to be executed."/>
                 </Parameter>
             </Action>
+
         </Schema>
     </edmx:DataServices>
 </edmx:Edmx>
