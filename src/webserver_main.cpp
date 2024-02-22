@@ -71,7 +71,7 @@ static int run()
     crow::Logger::setLogLevel(crow::LogLevel::Debug);
 #else
     // otherwise just enable the error logging
-    crow::Logger::setLogLevel(crow::LogLevel::Error);
+    crow::Logger::setLogLevel(crow::LogLevel::Debug);
 #endif
 
     auto io = std::make_shared<boost::asio::io_context>();

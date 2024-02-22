@@ -42,6 +42,7 @@ inline void
                      << " computed etag " << computedEtag;
     if (computedEtag != ifMatchHeader)
     {
+                BMCWEB_LOG_ERROR << " TEST: Etag mismatch";
         messages::preconditionFailed(asyncResp->res);
         return;
     }
@@ -72,6 +73,7 @@ inline bool handleIfMatch(crow::App& app, const crow::Request& req,
         req.req.method() != boost::beast::http::verb::post &&
         req.req.method() != boost::beast::http::verb::delete_)
     {
+        BMCWEB_LOG_ERROR << " TEST: req.method = " << req.req.method();
         messages::preconditionFailed(asyncResp->res);
         return false;
     }
@@ -120,6 +122,7 @@ inline bool handleIfMatch(crow::App& app, const crow::Request& req,
     std::string_view odataHeader = req.getHeaderValue("OData-Version");
     if (!odataHeader.empty() && odataHeader != "4.0")
     {
+                BMCWEB_LOG_ERROR << " TEST: odataHeader is 4.0, but it is = " << odataHeader;
         messages::preconditionFailed(asyncResp->res);
         return false;
     }
