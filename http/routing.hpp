@@ -671,11 +671,14 @@ class Router
 
         if (req.session == nullptr)
         {
+            BMCWEB_LOG_ERROR("TEST: After Match Rull req.session == nullptr");
             rule.handle(req, asyncResp, params);
             return;
         }
         validatePrivilege(req, asyncResp, rule,
                           [&rule, asyncResp, params](Request& thisReq) mutable {
+            BMCWEB_LOG_ERROR("TEST: After Match Rull thisReq.sessionValid = {}",
+                             (thisReq.session != nullptr));
             rule.handle(thisReq, asyncResp, params);
         });
     }

@@ -23,6 +23,7 @@ inline bool
 {
     if (req.session == nullptr)
     {
+        BMCWEB_LOG_ERROR(" TEST populateUserInfo session=nullptr");
         return false;
     }
 
@@ -42,6 +43,8 @@ inline bool
         return false;
     }
 
+    BMCWEB_LOG_ERROR(" TEST populateUserInfo, remoteUser={}", remoteUser);
+
     if (!remoteUser && (!passwordExpired || !userGroups))
     {
         BMCWEB_LOG_ERROR(
@@ -49,7 +52,13 @@ inline bool
         return false;
     }
 
+    BMCWEB_LOG_ERROR(
+        " TEST populateUserInfo SET userRole={}, sessionValid = {}", userRole,
+        (req.session != nullptr));
+    BMCWEB_LOG_ERROR(" TEST populateUserInfo SET BEFORE Set UserRole");
     req.session->userRole = userRole;
+    BMCWEB_LOG_ERROR(" TEST populateUserInfo SET AFTER Set UserRole");
+    // BMCWEB_LOG_DEBUG("userRole = {}", req.session->userRole);
     BMCWEB_LOG_DEBUG("userName = {} userRole = {}", req.session->username,
                      userRole);
 
@@ -63,6 +72,8 @@ inline bool
     {
         req.session->userGroups.swap(*userGroups);
     }
+
+    BMCWEB_LOG_ERROR(" TEST populateUserInfo Success");
 
     return true;
 }
@@ -121,6 +132,11 @@ void afterGetUserInfo(Request& req,
         return;
     }
 
+    if (req.session == nullptr)
+    {
+        BMCWEB_LOG_ERROR(" TEST afterGetUserInfo session=nullptr");
+    }
+
     if (!populateUserInfo(req, userInfoMap))
     {
         BMCWEB_LOG_ERROR("Failed to populate user information");
@@ -146,6 +162,7 @@ void validatePrivilege(Request& req,
 {
     if (req.session == nullptr)
     {
+        BMCWEB_LOG_ERROR(" TEST validatePrivilege session=nullptr");
         return;
     }
     std::string username = req.session->username;

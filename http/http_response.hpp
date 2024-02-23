@@ -55,6 +55,10 @@ struct Response
     {
         fields().insert(key, value);
     }
+    std::string_view getHeader(http::field key)
+    {
+        return fields()[key];
+    }
 
     void clearHeader(http::field key)
     {
@@ -242,14 +246,18 @@ struct Response
         // Only set etag if this request succeeded
         if (result() != http::status::ok)
         {
+            BMCWEB_LOG_ERROR(" TEST computeEtag result NOT OK");
             return "";
         }
         // and the json response isn't empty
         if (jsonValue.empty())
         {
+            BMCWEB_LOG_ERROR(" TEST computeEtag json empty");
             return "";
         }
         size_t hashval = std::hash<nlohmann::json>{}(jsonValue);
+        BMCWEB_LOG_ERROR(" TEST computeEtag HashValue={}, etag={}", hashval,
+                         std::string("\"") + intToHexString(hashval, 8) + "\"");
         return "\"" + intToHexString(hashval, 8) + "\"";
     }
 
@@ -271,9 +279,13 @@ struct Response
     void end()
     {
         std::string etag = computeEtag();
+        BMCWEB_LOG_ERROR("TEST end() = etag=({})", etag);
         if (!etag.empty())
         {
             addHeader(http::field::etag, etag);
+
+            std::string get_etag{getHeader(http::field::etag)};
+            BMCWEB_LOG_ERROR(" TEST: get_etag = ({})", get_etag);
         }
         if (completed)
         {
@@ -336,6 +348,11 @@ struct Response
         size_t hashval = std::hash<nlohmann::json>{}(jsonValue);
         std::string hexVal = "\"" + intToHexString(hashval, 8) + "\"";
         addHeader(http::field::etag, hexVal);
+
+        std::string get_etag{getHeader(http::field::etag)};
+        BMCWEB_LOG_ERROR(" TEST: setHashAndHandleNotModified get_etag = ({})",
+                         get_etag);
+
         if (expectedHash && hexVal == *expectedHash)
         {
             jsonValue = nullptr;

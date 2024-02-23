@@ -42,6 +42,15 @@ inline void
                      ifMatchHeader, computedEtag);
     if (computedEtag != ifMatchHeader)
     {
+        BMCWEB_LOG_ERROR(" TEST: Etag if-match mismatch  computedEtag = {}, {}",
+                         computedEtag, computedEtag.length());
+        BMCWEB_LOG_ERROR(" TEST: Etag if-match mismatch  ifMatchHeader= {}, {}",
+                         ifMatchHeader, ifMatchHeader.length());
+
+        bool chk1 = (computedEtag != ifMatchHeader);
+        bool chk2 = !(computedEtag == ifMatchHeader);
+        BMCWEB_LOG_ERROR(" TEST: chk1={} chk2={}", chk1, chk2);
+
         messages::preconditionFailed(asyncResp->res);
         return;
     }
@@ -63,6 +72,8 @@ inline bool handleIfMatch(crow::App& app, const crow::Request& req,
 
     std::string ifMatch{
         req.getHeaderValue(boost::beast::http::field::if_match)};
+
+    BMCWEB_LOG_ERROR(" TEST: ifMatch generated=({})", ifMatch);
     if (ifMatch.empty())
     {
         // No If-Match header.  Nothing to do
@@ -78,6 +89,7 @@ inline bool handleIfMatch(crow::App& app, const crow::Request& req,
         req.req.method() != boost::beast::http::verb::post &&
         req.req.method() != boost::beast::http::verb::delete_)
     {
+        BMCWEB_LOG_ERROR(" TEST: req.method is NOT patch/post/delete");
         messages::preconditionFailed(asyncResp->res);
         return false;
     }
@@ -127,6 +139,8 @@ inline bool handleIfMatch(crow::App& app, const crow::Request& req,
     std::string_view odataHeader = req.getHeaderValue("OData-Version");
     if (!odataHeader.empty() && odataHeader != "4.0")
     {
+        BMCWEB_LOG_ERROR(" TEST: odataHeader is 4.0, but it is = {}",
+                         odataHeader);
         messages::preconditionFailed(asyncResp->res);
         return false;
     }
