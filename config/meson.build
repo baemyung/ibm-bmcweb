@@ -12,6 +12,7 @@ feature_options = [
     'experimental-redfish-multi-computer-system',
     'google-api',
     'host-serial-socket',
+    'http-zstd',
     'http2',
     'hw-isolation',
     'hypervisor-computer-system',
