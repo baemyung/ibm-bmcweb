@@ -17,6 +17,7 @@
 #include "utils/chassis_utils.hpp"
 #include "utils/collection.hpp"
 #include "utils/dbus_utils.hpp"
+#include "utils/pcie_util.hpp"
 
 #include <asm-generic/errno.h>
 #include <sys/types.h>
@@ -208,8 +209,7 @@ inline void afterGetCableUpstreamResources(
     nlohmann::json::array_t linkArray;
     for (const auto& fullPath : endpoints)
     {
-        sdbusplus::message::object_path path(fullPath);
-        std::string devName = path.filename();
+        std::string devName = pcie_util::buildPCIeUniquePath(fullPath);
         if (devName.empty())
         {
             continue;

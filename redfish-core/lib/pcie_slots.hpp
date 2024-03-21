@@ -209,8 +209,8 @@ inline void afterAddLinkedPcieDevices(
     }
 
     // Assuming only one device path per slot.
-    sdbusplus::message::object_path pcieDevicePath(pcieDevicePaths.front());
-    std::string devName = pcieDevicePath.filename();
+    const std::string& pcieDevciePath = pcieDevicePaths.front();
+    std::string devName = pcie_util::buildPCIeUniquePath(pcieDevciePath);
 
     if (devName.empty())
     {
