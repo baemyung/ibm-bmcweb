@@ -168,7 +168,7 @@ inline void
                                   const MapperGetSubTreeResponse&)>&& callback)
 {
     crow::connections::systemBus->async_method_call(
-        [callback{std::move(callback)}](
+        [callback = std::move(callback)](
             const boost::system::error_code& ec,
             const MapperGetSubTreeResponse& subtree) { callback(ec, subtree); },
         "xyz.openbmc_project.ObjectMapper",
@@ -184,7 +184,7 @@ inline void getSubTreePaths(
                        const MapperGetSubTreePathsResponse&)>&& callback)
 {
     crow::connections::systemBus->async_method_call(
-        [callback{std::move(callback)}](
+        [callback = std::move(callback)](
             const boost::system::error_code& ec,
             const MapperGetSubTreePathsResponse& subtreePaths) {
             callback(ec, subtreePaths);
@@ -203,7 +203,7 @@ inline void getAssociatedSubTree(
                        const MapperGetSubTreeResponse&)>&& callback)
 {
     crow::connections::systemBus->async_method_call(
-        [callback{std::move(callback)}](
+        [callback = std::move(callback)](
             const boost::system::error_code& ec,
             const MapperGetSubTreeResponse& subtree) { callback(ec, subtree); },
         "xyz.openbmc_project.ObjectMapper",
@@ -220,7 +220,7 @@ inline void getAssociatedSubTreePaths(
                        const MapperGetSubTreePathsResponse&)>&& callback)
 {
     crow::connections::systemBus->async_method_call(
-        [callback{std::move(callback)}](
+        [callback = std::move(callback)](
             const boost::system::error_code& ec,
             const MapperGetSubTreePathsResponse& subtreePaths) {
             callback(ec, subtreePaths);
@@ -237,8 +237,8 @@ inline void getDbusObject(
                        const MapperGetObject&)>&& callback)
 {
     crow::connections::systemBus->async_method_call(
-        [callback{std::move(callback)}](const boost::system::error_code& ec,
-                                        const MapperGetObject& object) {
+        [callback = std::move(callback)](const boost::system::error_code& ec,
+                                         const MapperGetObject& object) {
             callback(ec, object);
         },
         "xyz.openbmc_project.ObjectMapper",
@@ -262,8 +262,8 @@ inline void getManagedObjects(
                        const ManagedObjectType&)>&& callback)
 {
     crow::connections::systemBus->async_method_call(
-        [callback{std::move(callback)}](const boost::system::error_code& ec,
-                                        const ManagedObjectType& objects) {
+        [callback = std::move(callback)](const boost::system::error_code& ec,
+                                         const ManagedObjectType& objects) {
             callback(ec, objects);
         },
         service, path, "org.freedesktop.DBus.ObjectManager",
