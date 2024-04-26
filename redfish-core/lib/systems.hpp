@@ -2040,21 +2040,16 @@ inline void getIdlePowerSaver(const std::shared_ptr<bmcweb::AsyncResp>& aResp)
  */
 inline void doGetEnabledPanelFunctions(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-    std::function<void(const std::vector<uint8_t>&)>&& callback)
+    std::function<void(const boost::system::error_code& ec,
+                       const std::vector<uint8_t>&)>&& callback)
 {
     BMCWEB_LOG_DEBUG << "Get Enabled Panel functions";
 
     crow::connections::systemBus->async_method_call(
-        [asyncResp, callback](const boost::system::error_code& ec,
-                              const std::vector<uint8_t>& enabledFuncs) {
-        if (ec)
-        {
-            BMCWEB_LOG_ERROR << "Get Enabled Panel Functions D-bus error: "
-                             << ec.value();
-            messages::internalError(asyncResp->res);
-            return;
-        }
-        callback(enabledFuncs);
+        [asyncResp, callback{std::move(callback)}](
+            const boost::system::error_code& ec,
+            const std::vector<uint8_t>& enabledFuncs) {
+        callback(ec, enabledFuncs);
     },
         "com.ibm.PanelApp", "/com/ibm/panel_app", "com.ibm.panel",
         "getEnabledFunctions");
@@ -2067,7 +2062,19 @@ inline void getEnabledPanelFunctions(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
 {
     doGetEnabledPanelFunctions(
-        asyncResp, [asyncResp](const std::vector<uint8_t>& enabledFuncs) {
+        asyncResp, [asyncResp](const boost::system::error_code& ec,
+                               const std::vector<uint8_t>& enabledFuncs) {
+        if (ec)
+        {
+            if (ec.value() != EBADR &&
+                ec.value() != boost::asio::error::host_unreachable)
+            {
+                BMCWEB_LOG_ERROR << "Get Enabled Panel Functions D-bus error: "
+                                 << ec.value();
+                messages::internalError(asyncResp->res);
+            }
+            return;
+        }
         nlohmann::json& oem = asyncResp->res.jsonValue["Oem"];
         oem["IBM"]["@odata.type"] = "#OemComputerSystem.v1_0_0.IBM";
         oem["IBM"]["EnabledPanelFunctions"] = enabledFuncs;
@@ -2157,7 +2164,15 @@ inline void handleSystemActionsOemExecutePanelFunctionPost(
 
     doGetEnabledPanelFunctions(
         asyncResp,
-        [funcNo, asyncResp](const std::vector<uint8_t>& enabledFuncs) {
+        [funcNo, asyncResp](const boost::system::error_code& ec,
+                            const std::vector<uint8_t>& enabledFuncs) {
+        if (ec)
+        {
+            BMCWEB_LOG_ERROR << "Get Enabled Panel Functions D-bus error: "
+                             << ec.value();
+            messages::internalError(asyncResp->res);
+            return;
+        }
         auto it = std::find(enabledFuncs.begin(), enabledFuncs.end(), funcNo);
         if (it == enabledFuncs.end())
         {
