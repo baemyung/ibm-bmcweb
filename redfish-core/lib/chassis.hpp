@@ -520,6 +520,9 @@ inline void handleChassisGetSubTree(
             "xyz.openbmc_project.Inventory.Decorator.Replaceable";
         const std::string revisionInterface =
             "xyz.openbmc_project.Inventory.Decorator.Revision";
+        const std::string versionInterface =
+            "xyz.openbmc_project.Software.Version";
+
         for (const auto& interface : interfaces2)
         {
             if (interface == assetTagInterface)
@@ -531,7 +534,7 @@ inline void handleChassisGetSubTree(
                         if (ec2)
                         {
                             BMCWEB_LOG_ERROR(
-                                "DBus response error for AssetTag: {}", ec2);
+                                "DBus response error for AssetTag: {}", ec2.value());
                             messages::internalError(asyncResp->res);
                             return;
                         }
@@ -548,14 +551,14 @@ inline void handleChassisGetSubTree(
                         {
                             BMCWEB_LOG_ERROR(
                                 "DBus response error for HotPluggable: {}",
-                                ec2);
+                                ec2.value());
                             messages::internalError(asyncResp->res);
                             return;
                         }
                         asyncResp->res.jsonValue["HotPluggable"] = property;
                     });
             }
-            else if (interface == revisionInterface)
+            else if (interface == replaceableInterface)
             {
                 dbus::utility::getProperty<std::string>(
                     connectionName, path, revisionInterface, "Version",
@@ -570,6 +573,24 @@ inline void handleChassisGetSubTree(
                         }
                         asyncResp->res.jsonValue["Version"] = property;
                     });
+            }
+            else if (interface == replaceableInterface)
+            {
+                sdbusplus::asio::getProperty<std::string>(
+                    *crow::connections::systemBus, connectionName, path,
+                    versionInterface, "Version",
+                    [asyncResp, chassisId(std::string(chassisId))](
+                        const boost::system::error_code& ec2,
+                        const std::string& property) {
+                    if (ec2)
+                    {
+                        BMCWEB_LOG_ERROR("DBus response error for Version, {}",
+                                         ec2.value());
+                        messages::internalError(asyncResp->res);
+                        return;
+                    }
+                    asyncResp->res.jsonValue["Version"] = property;
+                });
             }
         }
 
