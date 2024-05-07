@@ -27,7 +27,8 @@ inline void
     {
         return;
     }
-
+    
+    BMCWEB_LOG_ERROR << "TEST: updateFanSensorList path=" << fanSensorPath << ", value=" << value;
     nlohmann::json item;
     item["DataSourceUri"] = crow::utility::urlFromPieces(
         "redfish", "v1", "Chassis", chassisId, "Sensors", fanSensorName);
@@ -45,6 +46,9 @@ inline void getFanSensors(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
                           const std::string& chassisId,
                           const std::string& service, const std::string& path)
 {
+
+
+    BMCWEB_LOG_ERROR << "TEST: getFanSensors path=" << path << ", service=" << service;
     sdbusplus::asio::getProperty<double>(
         *crow::connections::systemBus, service, path,
         "xyz.openbmc_project.Sensor.Value", "Value",
