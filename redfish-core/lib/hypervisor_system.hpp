@@ -1373,7 +1373,8 @@ inline void handleHypervisorEthernetInterfacePatch(
     const std::string& clientIp = req.session->clientIp;
     getHypervisorIfaceData(
         ifaceId, asyncResp, //
-        [req, clientIp, asyncResp, ifaceId, hostName = std::move(hostName),
+        [req = std::make_shared<crow::Request>(req.copy()), clientIp, asyncResp,
+         ifaceId, hostName = std::move(hostName),
          ipv4StaticAddresses = std::move(ipv4StaticAddresses),
          ipv6StaticAddresses = std::move(ipv6StaticAddresses), ipv4DHCPEnabled,
          ipv6OperatingMode,
@@ -1383,7 +1384,7 @@ inline void handleHypervisorEthernetInterfacePatch(
                                 const std::vector<IPv4AddressData>&,
                                 const std::vector<IPv6AddressData>&) {
             handleHypervisorPatchFromIfaceData(
-                req, clientIp, asyncResp, ifaceId, hostName,
+                *req, clientIp, asyncResp, ifaceId, hostName,
                 ipv4StaticAddresses, ipv6StaticAddresses, ipv4DHCPEnabled,
                 ipv6OperatingMode, ipv6StaticDefaultGateways,
                 ipv6AutoConfigEnabled, success, ethData);

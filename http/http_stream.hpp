@@ -31,7 +31,7 @@ namespace streaming_response
 struct Connection : std::enable_shared_from_this<Connection>
 {
   public:
-    explicit Connection(const crow::Request& reqIn) : req(reqIn) {}
+    explicit Connection(const crow::Request& reqIn) : req(reqIn.copy()) {}
     virtual void sendMessage(const boost::asio::mutable_buffer& buffer,
                              std::function<void()> handler) = 0;
     virtual void close() = 0;

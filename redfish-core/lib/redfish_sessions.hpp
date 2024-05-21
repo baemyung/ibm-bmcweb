@@ -368,9 +368,11 @@ inline void handleSessionCollectionPost(
     }
     // check if secret key generation is required for the user
     checkGoogleAuthenticatorSecretKeyRequired(
-        username, [username, asyncResp, req, clientId = std::move(clientId)](
-                      const boost::system::error_code& ec, bool required) {
-            handleGoogleAuthenticatorSecretKeyCheck(username, asyncResp, req,
+        username,
+        [username, asyncResp, req = std::make_shared<crow::Request>(req.copy()),
+         clientId = std::move(clientId)](const boost::system::error_code& ec,
+                                         bool required) {
+            handleGoogleAuthenticatorSecretKeyCheck(username, asyncResp, *req,
                                                     clientId, ec, required);
         });
 }
