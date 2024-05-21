@@ -111,7 +111,8 @@ inline void setPCIeTopologyRefresh(
         *crow::connections::systemBus, "xyz.openbmc_project.PLDM",
         "/xyz/openbmc_project/pldm", "com.ibm.PLDM.PCIeTopology",
         "PCIeTopologyRefresh", state,
-        [req, asyncResp](const boost::system::error_code& ec) {
+        [asyncResp, req = std::make_shared<crow::Request>(req.copy())](
+            const boost::system::error_code& ec) {
             if (ec)
             {
                 BMCWEB_LOG_ERROR("PCIe Topology Refresh failed.{}", ec.value());
@@ -120,7 +121,7 @@ inline void setPCIeTopologyRefresh(
             }
             countPCIeTopologyRefresh = 0;
             pcieTopologyRefreshTimer =
-                std::make_unique<boost::asio::steady_timer>(*req.ioService);
+                std::make_unique<boost::asio::steady_timer>(*req->ioService);
             pcieTopologyRefreshTimer->expires_after(std::chrono::seconds(1));
             pcieTopologyRefreshTimer->async_wait(
                 [timer = pcieTopologyRefreshTimer.get(),

@@ -2721,9 +2721,9 @@ inline void
     crow::connections::systemBus->async_method_call(
         [asyncResp, username, password(std::move(password)),
          roleId(std::move(roleId)), enabled, newUser{std::string(*newUserName)},
-         locked, userSelf, req, accountTypes(std::move(accountTypes)),
-         mfaBypass](const boost::system::error_code& ec,
-                    sdbusplus::message_t& m) {
+         locked, userSelf, session = req.session,
+         accountTypes(std::move(accountTypes)), mfaBypass](
+            const boost::system::error_code& ec, sdbusplus::message_t& m) {
             if (ec)
             {
                 userErrorMessageHandler(m.get_error(), asyncResp, newUser,
@@ -2733,7 +2733,7 @@ inline void
 
             updateUserProperties(asyncResp, newUser, password, enabled, roleId,
                                  locked, accountTypes, userSelf, mfaBypass,
-                                 req.session);
+                                 session);
         },
         "xyz.openbmc_project.User.Manager", "/xyz/openbmc_project/user",
         "xyz.openbmc_project.User.Manager", "RenameUser", username,
@@ -2922,16 +2922,16 @@ inline void handleManagerAccountVerifyTotpAction(
     sdbusplus::message::object_path tempObjPath("/xyz/openbmc_project/user/");
     tempObjPath /= username;
     const std::string userPath(tempObjPath);
-    verifyTotpDbusUtil(asyncResp, totp, userPath,
-                       [username, req](bool success) {
-                           if (success)
-                           {
-                               // Remove existing sessions of the user
-                               persistent_data::SessionStore::getInstance()
-                                   .removeSessionsByUsernameExceptSession(
-                                       username, req.session);
-                           }
-                       });
+    verifyTotpDbusUtil(
+        asyncResp, totp, userPath,
+        [username, session = req.session](bool success) {
+            if (success)
+            {
+                // Remove existing sessions of the user
+                persistent_data::SessionStore::getInstance()
+                    .removeSessionsByUsernameExceptSession(username, session);
+            }
+        });
 }
 
 inline void

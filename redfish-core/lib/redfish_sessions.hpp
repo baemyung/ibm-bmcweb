@@ -326,8 +326,10 @@ inline void handleSessionCollectionPost(
     }
     // check if secret key generation is required for the user
     checkGoogleAuthenticatorSecretKeyRequired(
-        username, [username, asyncResp, req, clientId = std::move(clientId)](
-                      const boost::system::error_code& ec, bool required) {
+        username,
+        [username, asyncResp, req = std::make_shared<crow::Request>(req.copy()),
+         clientId = std::move(clientId)](const boost::system::error_code& ec,
+                                         bool required) {
             if (ec)
             {
                 BMCWEB_LOG_ERROR("secretKeyRequired check failed = {}",
@@ -337,7 +339,7 @@ inline void handleSessionCollectionPost(
             }
             std::shared_ptr<persistent_data::UserSession> session =
                 persistent_data::SessionStore::getInstance()
-                    .generateUserSession(username, req.ipAddress, clientId,
+                    .generateUserSession(username, req->ipAddress, clientId,
                                          persistent_data::SessionType::Session,
                                          required, required);
             if (!session)
@@ -345,7 +347,7 @@ inline void handleSessionCollectionPost(
                 messages::internalError(asyncResp->res);
                 return;
             }
-            processAfterSessionCreation(asyncResp, req, session, required);
+            processAfterSessionCreation(asyncResp, *req, session, required);
         });
 }
 

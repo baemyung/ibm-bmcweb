@@ -779,7 +779,7 @@ inline void handleChassisAssemblyPatch(
 
     getChassisAssembly(
         asyncResp, chassisID,
-        [req, asyncResp,
+        [req = std::make_shared<crow::Request>(req.copy()), asyncResp,
          chassisID](const std::optional<std::string>& validChassisPath,
                     const std::vector<std::string>& assemblyList) {
             if (!validChassisPath || assemblyList.empty())
@@ -790,7 +790,7 @@ inline void handleChassisAssemblyPatch(
                 return;
             }
 
-            setAssemblyLocationIndicators(req, asyncResp, chassisID,
+            setAssemblyLocationIndicators(*req, asyncResp, chassisID,
                                           assemblyList);
         });
 }
