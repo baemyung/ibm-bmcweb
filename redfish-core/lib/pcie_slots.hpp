@@ -237,6 +237,8 @@ inline void
                 const dbus::utility::MapperEndPoints& endpoints) {
         if (ec)
         {
+            BMCWEB_LOG_ERROR("TEST: linkAssociatedProcessor slot={}, ec={}",
+                             pcieSlotPath, ec);
             if (ec.value() == EBADR)
             {
                 // This PCIeSlot have no processor association.
@@ -250,8 +252,9 @@ inline void
 
         if (endpoints.empty())
         {
+            BMCWEB_LOG_ERROR("TEST: linkAssociatedProcessor slot={}, EMPTY",
+                             pcieSlotPath);
             BMCWEB_LOG_DEBUG("No association found for processor");
-            messages::internalError(asyncResp->res);
             return;
         }
 
@@ -315,6 +318,9 @@ inline void
                          const std::string& connectionName,
                          const std::string& pcieSlotPath)
 {
+    BMCWEB_LOG_ERROR("TEST: onPcieSlotGetAllDone pcieSlotPath={}, BEGIN",
+                     pcieSlotPath);
+
     if (ec)
     {
         BMCWEB_LOG_ERROR("Can't get PCIeSlot properties!");
@@ -420,6 +426,8 @@ inline void
     addLinkedFabricAdapter(asyncResp, pcieSlotPath, index);
 
     // Get processor link
+    linkAssociatedProcessor(asyncResp, pcieSlotPath, index);
+
     linkAssociatedDiskBackplane(asyncResp, pcieSlotPath, index);
 
     // Get pcie slot location indicator state
@@ -429,9 +437,6 @@ inline void
         nlohmann::json& slotItem = slotArray.at(index);
         slotItem["LocationIndicatorActive"] = asserted;
     });
-
-    // Get processor link
-    linkAssociatedProcessor(asyncResp, pcieSlotPath, index);
 }
 
 inline void onMapperAssociationDone(
@@ -461,6 +466,11 @@ inline void onMapperAssociationDone(
 
     sdbusplus::message::object_path path(pcieSlotChassis[0]);
     std::string chassisName = path.filename();
+
+    BMCWEB_LOG_ERROR(
+        "TEST: onMapperAssociationDone pcieSlotPath={}, chassisID={}, chassisName={}",
+        pcieSlotPath, chassisID, chassisName);
+
     if (chassisName != chassisID)
     {
         // The pcie slot doesn't belong to the chassisID
@@ -484,6 +494,7 @@ inline void
                         const boost::system::error_code& ec,
                         const dbus::utility::MapperGetSubTreeResponse& subtree)
 {
+    BMCWEB_LOG_ERROR("TEST: onMapperSubtreeDone BEGIN chassisId={}", chassisID);
     if (ec)
     {
         BMCWEB_LOG_ERROR("D-Bus response error on GetSubTree {}", ec);
@@ -509,20 +520,34 @@ inline void
     for (const auto& pathServicePair : subtree)
     {
         const std::string& pcieSlotPath = pathServicePair.first;
+
+        BMCWEB_LOG_ERROR(" TEST  :1: onMapperSubtreeDone pcieSlotPath={}",
+                         pcieSlotPath);
+
         for (const auto& connectionInterfacePair : pathServicePair.second)
         {
             const std::string& connectionName = connectionInterfacePair.first;
             sdbusplus::message::object_path pcieSlotAssociationPath(
                 pcieSlotPath);
-            pcieSlotAssociationPath /= "chassis";
+            pcieSlotAssociationPath /= "contained_by";
 
             // The association of this PCIeSlot is used to determine whether
             // it belongs to this ChassisID
-            dbus::utility::getAssociationEndPoints(
+            constexpr std::array<std::string_view, 1> chassisInterfaces = {
+                "xyz.openbmc_project.Inventory.Item.Chassis"};
+
+            dbus::utility::getAssociatedSubTreePaths(
                 std::string{pcieSlotAssociationPath},
+                sdbusplus::message::object_path(
+                    "/xyz/openbmc_project/inventory"),
+                0, chassisInterfaces,
                 [asyncResp, chassisID, pcieSlotPath, connectionName](
                     const boost::system::error_code& ec2,
                     const dbus::utility::MapperEndPoints& endpoints) {
+                BMCWEB_LOG_ERROR(
+                    "   TEST  :3: onMapperSubtreeDone  getAssociationEndPoints pcieSlotPath={}, connectionName={}, endpoints.size={}",
+                    pcieSlotPath, connectionName, endpoints.size());
+
                 onMapperAssociationDone(asyncResp, chassisID, pcieSlotPath,
                                         connectionName, ec2, endpoints);
             });
@@ -540,6 +565,8 @@ inline void handlePCIeSlotCollectionGet(
         return;
     }
 
+    BMCWEB_LOG_ERROR("TEST: handlePCIeSlotCollectionGet chassisId={}",
+                     chassisID);
     constexpr std::array<std::string_view, 1> interfaces = {
         "xyz.openbmc_project.Inventory.Item.PCIeSlot"};
     dbus::utility::getSubTree(
