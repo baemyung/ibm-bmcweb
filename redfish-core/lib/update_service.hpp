@@ -792,8 +792,12 @@ inline void
             if (param.second == "UpdateParameters")
             {
                 std::vector<std::string> targets;
-                nlohmann::json content =
-                    nlohmann::json::parse(formpart.content);
+                nlohmann::json content = nlohmann::json::parse(formpart.content,
+                                                               nullptr, false);
+                if (content.is_discarded())
+                {
+                    return std::nullopt;
+                }
                 if (!json_util::readJson(content, asyncResp->res, "Targets",
                                          targets, "@Redfish.OperationApplyTime",
                                          applyTime))
