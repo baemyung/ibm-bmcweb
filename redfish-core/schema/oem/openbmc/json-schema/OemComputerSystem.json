@@ -1,7 +1,7 @@
 {
-    "$id": "http://redfish.dmtf.org/schemas/v1/OemComputerSystem.json",
+    "$id": "https://github.com/openbmc/bmcweb/tree/master/static/redfish/v1/JsonSchemasOpenBMCComputerSystem.json",
     "$schema": "http://redfish.dmtf.org/schemas/v1/redfish-schema-v1.json",
-    "copyright": "Copyright 2014-2019 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright",
+    "copyright": "Copyright 2023 OpenBMC.",
     "definitions": {
         "FirmwareProvisioning": {
             "additionalProperties": false,
@@ -57,7 +57,7 @@
         },
         "Oem": {
             "additionalProperties": true,
-            "description": "OemComputerSystem Oem properties.",
+            "description": "OpenBMCComputerSystem Oem properties.",
             "patternProperties": {
                 "^([a-zA-Z_][a-zA-Z0-9_]*)?@(odata|Redfish|Message)\\.[a-zA-Z_][a-zA-Z0-9_]*$": {
                     "description": "This property shall specify a valid odata or Redfish property.",
@@ -256,5 +256,5 @@
             "versionAdded": "v1_0_0"
         }
     },
-    "title": "#OemComputerSystem"
+    "title": "#OpenBMCComputerSystem"
 }
