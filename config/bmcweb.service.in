@@ -1,5 +1,5 @@
 [Unit]
-Description=Start bmcweb server
+Description=Start bmcwebd server
 StartLimitIntervalSec=30
 StartLimitBurst=4
 
@@ -13,7 +13,7 @@ After=srvcfg-manager.service
 
 [Service]
 ExecReload=kill -s HUP $MAINPID
-ExecStart=@MESON_INSTALL_PREFIX@/bin/bmcweb
+ExecStart=@MESON_INSTALL_PREFIX@/libexec/bmcwebd
 Type=simple
 WorkingDirectory=/home/root
 
