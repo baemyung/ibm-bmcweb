@@ -68,6 +68,8 @@ inline void
     handleMetadataGet(App& /*app*/, const crow::Request& /*req*/,
                       const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
 {
+    BMCWEB_LOG_ERROR("TEST: handleMetadataGet START");
+
     std::filesystem::path schema("/usr/share/www/redfish/v1/schema");
     std::error_code ec;
     auto iter = std::filesystem::directory_iterator(schema, ec);
@@ -90,6 +92,8 @@ inline void
         {
             continue;
         }
+    
+         BMCWEB_LOG_ERROR("TEST:111: handleMetadataGet dirPath={}", dirEntry.path().string());
         std::string metadataPiece = getMetadataPieceForFile(dirEntry.path());
         if (metadataPiece.empty())
         {
@@ -111,6 +115,9 @@ inline void
     asyncResp->res.addHeader(boost::beast::http::field::content_type,
                              "application/xml");
     asyncResp->res.write(std::move(xml));
+
+    BMCWEB_LOG_ERROR("TEST: handleMetadataGet END");
+
 }
 
 inline void requestRoutesMetadata(App& app)
