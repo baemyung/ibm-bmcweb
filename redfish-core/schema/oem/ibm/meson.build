@@ -1,16 +1,16 @@
 # IBM schemas that should be installed
 schemas = [
+    'IBMAssembly',
+    'IBMFabricAdapter',
+    'IBMLogEntry',
+    'IBMLogEntryAttachment',
     'IBMManager',
-    'OemAssembly',
+    'IBMManagerAccount',
+    'IBMPCIeDevice',
+    'IBMPCIeSlots',
+    'IBMServiceRoot',
     'OemComputerSystem',
-    'OemFabricAdapter',
-    'OemLogEntryAttachment',
-    'OemLogEntry',
-    'OemManagerAccount',
     'OemMessage',
-    'OemPCIeDevice',
-    'OemPCIeSlots',
-    'OemServiceRoot',
     'OemUpdateService',
 ]
 
