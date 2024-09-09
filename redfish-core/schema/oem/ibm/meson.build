@@ -2,11 +2,11 @@
 schemas = [
     'IBMAssembly',
     'IBMFabricAdapter',
+    'IBMLogEntry',
+    'IBMLogEntryAttachment',
     'IBMManager',
     'IBMManagerAccount',
     'OemComputerSystem',
-    'OemLogEntryAttachment',
-    'OemLogEntry',
     'OemMessage',
     'OemPCIeDevice',
     'OemPCIeSlots',
