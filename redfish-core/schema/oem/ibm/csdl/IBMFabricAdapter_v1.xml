@@ -21,18 +21,18 @@
 
   <edmx:DataServices>
 
-    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="OemFabricAdapter">
+    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="IBMFabricAdapter">
       <Annotation Term="Redfish.OwningEntity" String="IBM"/>
     </Schema>
 
-    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="OemFabricAdapter.v1_0_0">
+    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="IBMFabricAdapter.v1_0_0">
       <Annotation Term="Redfish.OwningEntity" String="IBM"/>
 
       <ComplexType Name="Oem" BaseType="Resource.OemObject">
         <Annotation Term="OData.AdditionalProperties" Bool="true"/>
-        <Annotation Term="OData.Description" String="OemFabricAdapter Oem properties."/>
+        <Annotation Term="OData.Description" String="IBMFabricAdapter Oem properties."/>
         <Annotation Term="OData.AutoExpand"/>
-        <Property Name="IBM" Type="OemFabricAdapter.IBM"/>
+        <Property Name="IBM" Type="IBMFabricAdapter.IBM"/>
       </ComplexType>
 
       <ComplexType Name="IBM" BaseType="Resource.OemObject">
