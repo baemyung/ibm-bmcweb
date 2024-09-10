@@ -8,9 +8,9 @@ schemas = [
     'IBMManagerAccount',
     'IBMPCIeDevice',
     'IBMPCIeSlots',
+    'IBMServiceRoot',
     'OemComputerSystem',
     'OemMessage',
-    'OemServiceRoot',
     'OemUpdateService',
 ]
 
