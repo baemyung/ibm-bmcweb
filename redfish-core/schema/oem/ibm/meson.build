@@ -2,6 +2,7 @@
 schemas = [
     'IBMManager',
     'OemAssembly',
+    'OemComputerSystem',
     'OemFabricAdapter',
     'OemLogEntryAttachment',
     'OemLogEntry',
