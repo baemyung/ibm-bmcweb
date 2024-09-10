@@ -199,9 +199,8 @@ inline void
     asyncResp->res.jsonValue["Oem"]["IBM"]["DateTimeLocalOffset"] =
         redfishDateTimeOffset.second;
     handleACFWindowActive(asyncResp);
-    asyncResp->res.jsonValue["Oem"]["@odata.type"] = "#OemServiceRoot.Oem";
     asyncResp->res.jsonValue["Oem"]["IBM"]["@odata.type"] =
-        "#OemServiceRoot.IBM";
+        "#IBMServiceRoot.IBM";
 }
 
 inline void
