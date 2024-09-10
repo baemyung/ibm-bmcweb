@@ -6,10 +6,10 @@ schemas = [
     'IBMLogEntryAttachment',
     'IBMManager',
     'IBMManagerAccount',
+    'IBMPCIeDevice',
+    'IBMPCIeSlots',
     'OemComputerSystem',
     'OemMessage',
-    'OemPCIeDevice',
-    'OemPCIeSlots',
     'OemServiceRoot',
     'OemUpdateService',
 ]

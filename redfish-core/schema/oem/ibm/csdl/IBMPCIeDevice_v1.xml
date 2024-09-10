@@ -20,18 +20,18 @@
   </edmx:Reference>
 
   <edmx:DataServices>
-    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="OemPCIeDevice">
+    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="IBMPCIeDevice">
       <Annotation Term="Redfish.OwningEntity" String="IBM"/>
     </Schema>
 
-    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="OemPCIeDevice.v1_0_0">
+    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="IBMPCIeDevice.v1_0_0">
       <Annotation Term="Redfish.OwningEntity" String="IBM"/>
 
       <ComplexType Name="Oem" BaseType="Resource.OemObject">
         <Annotation Term="OData.AdditionalProperties" Bool="true"/>
-        <Annotation Term="OData.Description" String="OemPCIeDevice Oem properties."/>
+        <Annotation Term="OData.Description" String="IBMPCIeDevice Oem properties."/>
         <Annotation Term="OData.AutoExpand"/>
-        <Property Name="IBM" Type="OemPCIeDevice.v1_0_0.IBM"/>
+        <Property Name="IBM" Type="IBMPCIeDevice.v1_0_0.IBM"/>
       </ComplexType>
 
       <ComplexType Name="IBM" BaseType="Resource.OemObject">
