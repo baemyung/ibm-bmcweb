@@ -3,6 +3,8 @@
 #include "dbus_singleton.hpp"
 #include "dbus_utility.hpp"
 #include "http_request.hpp"
+#include "ibm_locks.hpp"
+#include "ibm_utils.hpp"
 #include "logging.hpp"
 #include "multipart_parser.hpp"
 #include "query.hpp"
@@ -21,8 +23,6 @@
 #include <boost/container/flat_map.hpp>
 #include <error_messages.hpp>
 #include <event_service_manager.hpp>
-#include <ibm/locks.hpp>
-#include <ibm/utils.hpp>
 #include <nlohmann/json.hpp>
 #include <resource_messages.hpp>
 #include <sdbusplus/bus/match.hpp>

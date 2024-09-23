@@ -1,6 +1,6 @@
 #include "async_resp.hpp"
 #include "http_response.hpp"
-#include "ibm/management_console_rest.hpp"
+#include "ibm_management_console_rest.hpp"
 
 #include <memory>
 #include <string>

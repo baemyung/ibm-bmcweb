@@ -1,4 +1,4 @@
-#include "ibm/locks.hpp"
+#include "ibm_locks.hpp"
 
 #include <cstdint>
 #include <string>
