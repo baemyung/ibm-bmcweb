@@ -17,7 +17,6 @@
 #include "led.hpp"
 #include "logging.hpp"
 #include "oem/ibm/usb_code_update.hpp"
-#include "openbmc/openbmc_managers.hpp"
 #include "persistent_data.hpp"
 #include "query.hpp"
 #include "redfish.hpp"
@@ -1033,47 +1032,6 @@ inline void requestRoutesManager(App& app)
                     return;
                 }
 
-                if (pidControllers || fanControllers || fanZones ||
-                    stepwiseControllers || profile)
-                {
-                    if constexpr (BMCWEB_REDFISH_OEM_MANAGER_FAN_DATA)
-                    {
-                        std::vector<
-                            std::pair<std::string,
-                                      std::optional<nlohmann::json::object_t>>>
-                            configuration;
-                        if (pidControllers)
-                        {
-                            configuration.emplace_back(
-                                "PidControllers", std::move(pidControllers));
-                        }
-                        if (fanControllers)
-                        {
-                            configuration.emplace_back(
-                                "FanControllers", std::move(fanControllers));
-                        }
-                        if (fanZones)
-                        {
-                            configuration.emplace_back("FanZones",
-                                                       std::move(fanZones));
-                        }
-                        if (stepwiseControllers)
-                        {
-                            configuration.emplace_back(
-                                "StepwiseControllers",
-                                std::move(stepwiseControllers));
-                        }
-                        auto pid = std::make_shared<SetPIDValues>(
-                            asyncResp, std::move(configuration), profile);
-                        pid->run();
-                    }
-                    else
-                    {
-                        messages::propertyUnknown(asyncResp->res, "Oem");
-                        return;
-                    }
-                }
-
                 if (usbCodeUpdateEnabled)
                 {
                     if constexpr (BMCWEB_IBM_USB_CODE_UPDATE)
@@ -1103,6 +1061,8 @@ inline void requestRoutesManager(App& app)
                     setLocationIndicatorActiveState(
                         asyncResp, *locationIndicatorActive, managerId);
                 }
+
+                RedfishService::getInstance(app).handleSubRoute(req, asyncResp);
             });
 }
 
