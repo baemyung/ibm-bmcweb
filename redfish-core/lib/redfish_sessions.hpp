@@ -11,7 +11,7 @@
 #include "audit_events.hpp"
 #include "cookies.hpp"
 #include "dbus_privileges.hpp"
-#include "dbus_singleton.hpp"
+#include "dbus_utility.hpp"
 #include "error_messages.hpp"
 #include "http_request.hpp"
 #include "http_response.hpp"
@@ -293,7 +293,7 @@ inline void checkGoogleAuthenticatorSecretKeyRequired(
     std::function<void(const boost::system::error_code& ec, bool)> callback)
 {
     sdbusplus::message::object_path userPath("/xyz/openbmc_project/user");
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [callback = std::move(callback)](const boost::system::error_code& ec,
                                          bool val) { callback(ec, val); },
         "xyz.openbmc_project.User.Manager", userPath,

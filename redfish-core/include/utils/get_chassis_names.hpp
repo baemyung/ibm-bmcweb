@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dbus_singleton.hpp"
+#include "dbus_utility.hpp"
 
 #include <boost/system/errc.hpp>
 #include <boost/system/error_code.hpp>
@@ -23,7 +23,7 @@ inline void getChassisNames(F&& cb)
     const std::array<const char*, 1> interfaces = {
         "xyz.openbmc_project.Inventory.Item.Chassis"};
 
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [callback = std::forward<F>(
              cb)](const boost::system::error_code ec,
                   const std::vector<std::string>& chassis) {

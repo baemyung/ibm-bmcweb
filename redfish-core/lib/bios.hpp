@@ -852,7 +852,8 @@ inline void handleBiosResetPost(
         return;
     }
 
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
+        asyncResp,
         [asyncResp](const boost::system::error_code& ec) {
             if (ec)
             {

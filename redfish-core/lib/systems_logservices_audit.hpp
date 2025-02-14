@@ -4,7 +4,7 @@
 
 #include "app.hpp"
 #include "async_resp.hpp"
-#include "dbus_singleton.hpp"
+#include "dbus_utility.hpp"
 #include "error_messages.hpp"
 #include "generated/enums/log_service.hpp"
 #include "http_body.hpp"
@@ -486,7 +486,7 @@ inline void handleLogServicesAuditLogEntriesCollectionGet(
 
     /* Create unique entry for each entry in log file.
      */
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [asyncResp, skip, top](const boost::system::error_code& ec,
                                const sdbusplus::message::unix_fd& unixfd) {
             if (ec)
@@ -528,7 +528,7 @@ inline void handleLogServicesAuditLogEntryGet(
     }
 
     /* Search for entry matching targetID. */
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [asyncResp, targetID](const boost::system::error_code& ec,
                               const sdbusplus::message::unix_fd& unixfd) {
             if (ec)
@@ -651,7 +651,7 @@ inline void handleFullAuditLogAttachment(
     }
 
     /* Download attachment */
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [asyncResp, entryID](const boost::system::error_code& ec,
                              const sdbusplus::message::unix_fd& unixfd) {
             if (ec)

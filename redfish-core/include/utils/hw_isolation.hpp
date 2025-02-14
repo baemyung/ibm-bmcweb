@@ -115,7 +115,7 @@ inline void isolateResource(
     const sdbusplus::message::object_path& resourceObjPath,
     const std::string& hwIsolationDbusName)
 {
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [asyncResp, resourceName, resourceId,
          resourceObjPath](const boost::system::error_code& ec,
                           const sdbusplus::message::message& msg) {
@@ -237,7 +237,7 @@ inline void deisolateResource(
             resourceIsolatedHwEntry = vEndpoints.back();
 
             // De-isolate the given resource
-            crow::connections::systemBus->async_method_call(
+            dbus::utility::async_method_call(
                 [asyncResp, resourceIsolatedHwEntry,
                  resourceObjPath](const boost::system::error_code& ec1,
                                   const sdbusplus::message::message& msg) {

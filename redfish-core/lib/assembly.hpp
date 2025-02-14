@@ -417,7 +417,7 @@ inline void startOrStopADCSensor(
         method = "StopUnit";
     }
 
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [asyncResp](const boost::system::error_code& ec) {
             if (ec)
             {
@@ -641,7 +641,7 @@ inline void setAssemblyLocationIndicators(
                     action = "deleteFRUVPD";
                 }
 
-                crow::connections::systemBus->async_method_call(
+                dbus::utility::async_method_call(
                     [asyncResp, action](const boost::system::error_code& ec) {
                         if (ec)
                         {
@@ -787,7 +787,7 @@ inline void fillWithAssemblyId(
             // Mak sure whether the retrieved assembly associations are
             // implemented before finding the assembly id as per bmcweb Assembly
             // design.
-            crow::connections::systemBus->async_method_call(
+            dbus::utility::async_method_call(
                 [asyncResp, assemblyUriPropPath, assemblyParentObjPath,
                  assembledObjPath, assemblyAssoc, assembledUriVal](
                     const boost::system::error_code& ec1,

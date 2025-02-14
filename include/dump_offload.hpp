@@ -134,7 +134,7 @@ class Handler : public std::enable_shared_from_this<Handler>
     {
         std::string dumpEntryPath = std::format(
             "/xyz/openbmc_project/dump/{}/entry/{}", dumpType, entryID);
-        crow::connections::systemBus->async_method_call(
+        dbus::utility::async_method_call(
             [this,
              self(shared_from_this())](const boost::system::error_code& ec) {
                 if (ec)

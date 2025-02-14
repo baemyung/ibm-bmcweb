@@ -4,7 +4,6 @@
 
 #include "app.hpp"
 #include "async_resp.hpp"
-#include "dbus_singleton.hpp"
 #include "dbus_utility.hpp"
 #include "error_messages.hpp"
 #include "http_request.hpp"
@@ -32,7 +31,7 @@ inline void createSecretKeyUtil(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     const std::string& username, const std::string& userPath)
 {
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [asyncResp, username](const boost::system::error_code& ec,
                               const std::string& secretKey) {
             if (ec)
@@ -90,7 +89,7 @@ inline void verifyTotpDbusUtil(
     const bool googleAuthEnabled, const std::string& totp,
     const std::string& userPath, std::function<void(bool)>&& callback)
 {
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [asyncResp, callback = std::move(callback),
          googleAuthEnabled](const boost::system::error_code& ec, bool status) {
             if (ec)
@@ -245,7 +244,7 @@ inline void clearSecretKeyDbusUtil(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     const std::string& userPath)
 {
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [asyncResp](const boost::system::error_code& ec,
                     const sdbusplus::message_t& msg) {
             handleClearSecretKeyResponse(asyncResp, ec, msg);

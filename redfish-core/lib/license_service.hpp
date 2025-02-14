@@ -181,7 +181,7 @@ static void resetLicenseActivationStatus(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
 {
     std::string value{"com.ibm.License.LicenseManager.Status.Pending"};
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [asyncResp](const boost::system::error_code& ec) {
             if (ec)
             {
@@ -203,7 +203,7 @@ static void resetLicenseString(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
 {
     std::string value;
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [asyncResp](const boost::system::error_code& ec) {
             if (ec)
             {
@@ -295,7 +295,7 @@ static void handleLicensePost(
         std::make_shared<boost::asio::steady_timer>(
             crow::connections::systemBus->get_io_context());
     timeout->expires_after(std::chrono::seconds(20));
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [timeout, asyncResp,
          licenseString](const boost::system::error_code& ec) {
             if (ec)

@@ -108,7 +108,7 @@ inline void setLampTestState(
                         return;
                     }
 
-                    crow::connections::systemBus->async_method_call(
+                    dbus::utility::async_method_call(
                         [asyncResp](const boost::system::error_code& ec2) {
                             if (ec2)
                             {

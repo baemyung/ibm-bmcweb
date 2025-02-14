@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dbus_singleton.hpp"
+#include "dbus_utility.hpp"
 #include "http_request.hpp"
 #include "logging.hpp"
 #include "multipart_parser.hpp"
@@ -894,7 +895,7 @@ inline void deleteVMIDbusEntry(
             return;
         }
     };
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         respHandler, "xyz.openbmc_project.Certs.ca.authority.Manager",
         "/xyz/openbmc_project/certs/ca/entry/" + entryId,
         "xyz.openbmc_project.Object.Delete", "Delete");
@@ -904,7 +905,7 @@ inline void getCSREntryCertificate(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     const std::string& entryId)
 {
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [asyncResp](const boost::system::error_code ec,
                     const std::variant<std::string>& certificate) {
             if (ec)
@@ -951,7 +952,7 @@ inline void getCSREntryCertificate(
 inline void getCSREntryAck(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
                            const std::string& entryId)
 {
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [asyncResp, entryId](const boost::system::error_code ec,
                              const std::variant<std::string>& hostAck) {
             if (ec)
@@ -1020,7 +1021,7 @@ static void handleCsrRequest(
             crow::connections::systemBus->get_io_context());
 
     timeout->expires_after(std::chrono::seconds(30));
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [asyncResp, timeout](const boost::system::error_code ec,
                              sdbusplus::message::message& m) {
             sdbusplus::message::object_path objPath;
@@ -1152,7 +1153,7 @@ inline void handlePassThrough(
         asyncResp->res.write(strData.c_str());
     };
 
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         respHandler, "org.open_power.OCC.Control",
         "/org/open_power/control/" + name, "org.open_power.OCC.PassThrough",
         "Send", command);

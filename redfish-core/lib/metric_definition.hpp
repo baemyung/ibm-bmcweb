@@ -2,7 +2,7 @@
 
 #include "app.hpp"
 #include "async_resp.hpp"
-#include "dbus_singleton.hpp"
+#include "dbus_utility.hpp"
 #include "error_messages.hpp"
 #include "generated/enums/metric_definition.hpp"
 #include "http_request.hpp"
@@ -66,7 +66,7 @@ inline void getReadingRange(
     const std::string& property,
     std::function<void(boost::system::error_code, double)> callback)
 {
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [callback = std::move(callback)](
             boost::system::error_code ec,
             const std::variant<std::monostate, double, uint64_t, int64_t,
@@ -142,7 +142,7 @@ inline void getSensorService(
         std::string,
         std::vector<std::pair<std::string, std::vector<std::string>>>>;
 
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [sensorPath, callback = std::move(callback)](
             boost::system::error_code ec,
             const std::vector<ResultType>& result) {

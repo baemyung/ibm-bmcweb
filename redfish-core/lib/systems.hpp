@@ -2134,7 +2134,7 @@ inline void doGetEnabledPanelFunctions(
 {
     BMCWEB_LOG_DEBUG("Get Enabled Panel functions");
 
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [asyncResp, callback = std::move(callback)](
             const boost::system::error_code& ec,
             const std::vector<uint8_t>& enabledFuncs) {
@@ -2179,7 +2179,7 @@ inline void executePanelFunction(
 {
     BMCWEB_LOG_DEBUG("Execute Panel function {}", std::to_string(funcNo));
 
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
         [asyncResp,
          funcNo](const boost::system::error_code& ec,
                  const sdbusplus::message_t& msg,
@@ -2542,7 +2542,8 @@ inline void doNMI(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
         "xyz.openbmc_project.Control.Host.NMI";
     constexpr const char* method = "NMI";
 
-    crow::connections::systemBus->async_method_call(
+    dbus::utility::async_method_call(
+        asyncResp,
         [asyncResp](const boost::system::error_code& ec) {
             if (ec)
             {

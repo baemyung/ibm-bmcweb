@@ -1142,7 +1142,7 @@ inline void deleteSystemHardwareIsolationLogEntryById(
             }
 
             // Delete the respective dbus entry object
-            crow::connections::systemBus->async_method_call(
+            dbus::utility::async_method_call(
                 [asyncResp,
                  entryObjPath](const boost::system::error_code& ec1,
                                const sdbusplus::message::message& msg) {
@@ -1259,7 +1259,7 @@ inline void postSystemHardwareIsolationLogServiceClearLog(
             }
 
             // Delete all HardwareIsolation entries
-            crow::connections::systemBus->async_method_call(
+            dbus::utility::async_method_call(
                 [asyncResp](const boost::system::error_code& ec1) {
                     if (ec1)
                     {
