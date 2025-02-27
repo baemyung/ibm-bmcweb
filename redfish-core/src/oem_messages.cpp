@@ -34,8 +34,7 @@ namespace messages
 nlohmann::json taskAborted(const std::string& arg1, const std::string& arg2,
                            const std::string& arg3, const std::string& arg4)
 {
-    const redfish::registries::Header& header =
-        redfish::registries::task_event::header;
+    const registries::Header& header = redfish::registries::TaskEvent::header;
 
     std::string msgId;
     std::string_view msgName = "TaskAborted";

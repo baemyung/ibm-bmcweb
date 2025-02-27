@@ -2,9 +2,15 @@
 
 #include "registries.hpp"
 
-namespace redfish::registries::bios
+#include <span>
+
+// clang-format off
+
+namespace redfish::registries
 {
-const Header header = {
+struct BiosAttributeRegistry
+{
+static constexpr Header header = {
     "Copyright 2020 OpenBMC. All rights reserved.",
     "#MessageRegistry.v1_4_0.MessageRegistry",
     1,
@@ -16,5 +22,20 @@ const Header header = {
     "BiosAttributeRegistry",
     "DMTF",
 };
-constexpr const char* url = nullptr;
-} // namespace redfish::registries::bios
+
+static constexpr const char* url = nullptr;
+
+static constexpr std::span<const MessageEntry> registry =
+{
+};
+
+enum class Index
+{
+};
+}; // struct struct BiosAttributeRegistry
+
+
+[[gnu::constructor]] inline void registerBiosAttributeRegistry()
+{ registerRegistry<BiosAttributeRegistry>(); }
+
+} // namespace redfish::registries

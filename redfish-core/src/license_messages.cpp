@@ -34,16 +34,16 @@ namespace redfish
 namespace messages
 {
 
-static nlohmann::json getLog(redfish::registries::license::Index name,
+static nlohmann::json getLog(redfish::registries::License::Index name,
                              std::span<const std::string_view> args)
 {
     size_t index = static_cast<size_t>(name);
-    if (index >= redfish::registries::license::registry.size())
+    if (index >= redfish::registries::License::registry.size())
     {
         return {};
     }
-    return getLogFromRegistry(redfish::registries::license::header,
-                              redfish::registries::license::registry, index,
+    return getLogFromRegistry(redfish::registries::License::header,
+                              redfish::registries::License::registry, index,
                               args);
 }
 
@@ -56,7 +56,7 @@ static nlohmann::json getLog(redfish::registries::license::Index name,
  */
 nlohmann::json licenseInstalled(std::string_view arg1)
 {
-    return getLog(redfish::registries::license::Index::licenseInstalled,
+    return getLog(redfish::registries::License::Index::licenseInstalled,
                   std::to_array({arg1}));
 }
 
@@ -76,7 +76,7 @@ void licenseInstalled(crow::Response& res, std::string_view arg1)
 nlohmann::json daysBeforeExpiration(std::string_view arg1,
                                     std::string_view arg2)
 {
-    return getLog(redfish::registries::license::Index::daysBeforeExpiration,
+    return getLog(redfish::registries::License::Index::daysBeforeExpiration,
                   std::to_array({arg1, arg2}));
 }
 
@@ -96,7 +96,7 @@ void daysBeforeExpiration(crow::Response& res, std::string_view arg1,
  */
 nlohmann::json gracePeriod(std::string_view arg1, std::string_view arg2)
 {
-    return getLog(redfish::registries::license::Index::gracePeriod,
+    return getLog(redfish::registries::License::Index::gracePeriod,
                   std::to_array({arg1, arg2}));
 }
 
@@ -116,7 +116,7 @@ void gracePeriod(crow::Response& res, std::string_view arg1,
  */
 nlohmann::json expired(std::string_view arg1)
 {
-    return getLog(redfish::registries::license::Index::expired,
+    return getLog(redfish::registries::License::Index::expired,
                   std::to_array({arg1}));
 }
 
@@ -135,7 +135,7 @@ void expired(crow::Response& res, std::string_view arg1)
  */
 nlohmann::json installFailed(std::string_view arg1)
 {
-    return getLog(redfish::registries::license::Index::installFailed,
+    return getLog(redfish::registries::License::Index::installFailed,
                   std::to_array({arg1}));
 }
 
@@ -154,7 +154,7 @@ void installFailed(crow::Response& res, std::string_view arg1)
  */
 nlohmann::json invalidLicense()
 {
-    return getLog(redfish::registries::license::Index::invalidLicense, {});
+    return getLog(redfish::registries::License::Index::invalidLicense, {});
 }
 
 void invalidLicense(crow::Response& res)
@@ -172,7 +172,7 @@ void invalidLicense(crow::Response& res)
  */
 nlohmann::json notApplicableToTarget()
 {
-    return getLog(redfish::registries::license::Index::notApplicableToTarget,
+    return getLog(redfish::registries::License::Index::notApplicableToTarget,
                   {});
 }
 
@@ -191,7 +191,7 @@ void notApplicableToTarget(crow::Response& res)
  */
 nlohmann::json targetsRequired()
 {
-    return getLog(redfish::registries::license::Index::targetsRequired, {});
+    return getLog(redfish::registries::License::Index::targetsRequired, {});
 }
 
 void targetsRequired(crow::Response& res)
