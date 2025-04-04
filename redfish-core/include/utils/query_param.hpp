@@ -16,6 +16,7 @@
 #include "logging.hpp"
 #include "redfishoemrule.hpp"
 #include "str_utility.hpp"
+#include "sub_request.hpp"
 #include "utils/json_utils.hpp"
 
 #include <unistd.h>
@@ -835,7 +836,7 @@ class MultiAsyncResp : public std::enable_shared_from_this<MultiAsyncResp>
     }
 
     static void startMultiFragmentHandle(
-        const std::shared_ptr<crow::Request>& req,
+        const std::shared_ptr<redfish::SubRequest>& req,
         const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
         const std::shared_ptr<std::vector<OemBaseRule*>>& fragments,
         const std::shared_ptr<std::vector<std::string>>& params,
@@ -849,8 +850,9 @@ class MultiAsyncResp : public std::enable_shared_from_this<MultiAsyncResp>
             {
                 OemBaseRule& fragmentRule = *fragment;
                 auto rsp = std::make_shared<bmcweb::AsyncResp>();
-                BMCWEB_LOG_DEBUG("Matched fragment GET rule '{}' {}",
-                                 fragmentRule.rule, req->methodString());
+                BMCWEB_LOG_DEBUG("Matched fragment rule '{}' method '{}'",
+                                 fragmentRule.rule,
+                                 boost::beast::http::to_string(req->method()));
                 BMCWEB_LOG_DEBUG(
                     "Handling fragment rules: setting completion handler on {}",
                     logPtr(&rsp->res));
