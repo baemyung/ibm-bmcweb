@@ -27,15 +27,18 @@
 #include "utils/json_utils.hpp"
 #include "utils/time_utils.hpp"
 
+#include <asm-generic/errno.h>
 #include <security/_pam_types.h>
 #include <systemd/sd-bus.h>
 
 #include <boost/beast/http/field.hpp>
 #include <boost/beast/http/status.hpp>
 #include <boost/beast/http/verb.hpp>
+#include <boost/system/error_code.hpp>
 #include <boost/url/format.hpp>
 #include <boost/url/url.hpp>
 #include <nlohmann/json.hpp>
+#include <sdbusplus/asio/property.hpp>
 #include <sdbusplus/message.hpp>
 #include <sdbusplus/unpack_properties.hpp>
 
@@ -838,6 +841,23 @@ inline void handleUserNameAttrPatch(
         "UserNameAttribute", userNameAttribute);
 }
 
+inline void setPropertyAllowUnauthACFUpload(
+    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp, bool allow)
+{
+    sdbusplus::asio::setProperty(
+        *crow::connections::systemBus, "xyz.openbmc_project.Settings",
+        "/xyz/openbmc_project/ibmacf/allow_unauth_upload",
+        "xyz.openbmc_project.Object.Enable", "Enabled", allow,
+        [asyncResp](const boost::system::error_code& ec) {
+            if (ec)
+            {
+                BMCWEB_LOG_ERROR("D-Bus responses error: {}", ec.value());
+                messages::internalError(asyncResp->res);
+                return;
+            }
+        });
+}
+
 inline void getAcfProperties(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     const std::tuple<std::vector<uint8_t>, bool, std::string>& messageFDbus)
@@ -932,6 +952,27 @@ inline void getAcfProperties(
     }
     asyncResp->res.jsonValue["Oem"]["IBM"]["ACF"]["ACFInstalled"] =
         acfInstalled;
+
+    dbus::utility::getProperty<bool>(
+        "xyz.openbmc_project.Settings",
+        "/xyz/openbmc_project/ibmacf/allow_unauth_upload",
+        "xyz.openbmc_project.Object.Enable", "Enabled",
+        // ast-grep-ignore: long-lambda
+        [asyncResp](const boost::system::error_code& ec,
+                    const bool allowUnauthACFUpload) {
+            if (ec)
+            {
+                if (ec.value() != EBADR)
+                {
+                    BMCWEB_LOG_ERROR("D-Bus responses error: {}", ec.value());
+                    messages::internalError(asyncResp->res);
+                }
+                return;
+            }
+            asyncResp->res
+                .jsonValue["Oem"]["IBM"]["ACF"]["AllowUnauthACFUpload"] =
+                allowUnauthACFUpload;
+        });
 }
 
 /**
@@ -1468,6 +1509,10 @@ inline void afterReadAcfWindowActive(
     uploadACF(asyncResp, decodedAcf);
 }
 
+// This is called when someone either is not authenticated or is not
+// authorized to upload an ACF, and they are trying to upload an ACF;
+// in this condition, uploading an ACF is allowed when
+// AllowUnauthACFUpload is true.
 inline void triggerUnauthenticatedACFUpload(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     nlohmann::json::object_t& oem)
@@ -1475,7 +1520,7 @@ inline void triggerUnauthenticatedACFUpload(
     std::optional<nlohmann::json::object_t> ibm;
     if (!redfish::json_util::readJsonObject(oem, asyncResp->res, "IBM", ibm))
     {
-        BMCWEB_LOG_ERROR("Illegal Property ");
+        BMCWEB_LOG_WARNING("Illegal Property ");
         messages::propertyMissing(asyncResp->res, "IBM");
         return;
     }
@@ -1484,8 +1529,10 @@ inline void triggerUnauthenticatedACFUpload(
     std::optional<std::string> acfFile{};
     if (ibm)
     {
-        if (!redfish::json_util::readJsonObject(oem, asyncResp->res, "IBM/ACF",
-                                                acf, "IBM/ACFFile", acfFile))
+        if (!redfish::json_util::readJsonObject(oem, asyncResp->res,   //
+                                                "IBM/ACF", acf,        //
+                                                "IBM/ACFFile", acfFile //
+                                                ))
         {
             BMCWEB_LOG_WARNING("Illegal Property ");
             messages::propertyMissing(asyncResp->res, "ACF");
@@ -2749,72 +2796,58 @@ inline void handleAccountPatch(
 
     if (oem)
     {
-        std::optional<nlohmann::json::object_t> ibm;
-        if (!redfish::json_util::readJsonObject(*oem, asyncResp->res, "IBM",
-                                                ibm))
+        if (username != "service")
         {
-            BMCWEB_LOG_WARNING("Illegal Property ");
-            messages::propertyMissing(asyncResp->res, "IBM");
+            // Only the service user has Oem properties
+            messages::resourceAtUriUnauthorized(
+                asyncResp->res, req.url(),
+                "Oem properties access not allowed by non service user");
             return;
         }
-        if (ibm)
+
+        std::optional<std::string> acfFile;
+        std::optional<bool> allowUnauthACFUpload;
+
+        if (!redfish::json_util::readJsonObject(
+                *oem, asyncResp->res,                                //
+                "IBM/ACF/ACFFile", acfFile,                          //
+                "IBM/ACF/AllowUnauthACFUpload", allowUnauthACFUpload //
+                ))
         {
-            std::optional<nlohmann::json::object_t> acf;
-            if (!redfish::json_util::readJsonObject(*ibm, asyncResp->res, "ACF",
-                                                    acf))
+            BMCWEB_LOG_WARNING("Illegal Property");
+            messages::propertyMissing(asyncResp->res, "Oem/IBM/ACF/ACFFile");
+            messages::propertyMissing(asyncResp->res,
+                                      "Oem/IBM/ACF/AllowUnauthACFUpload");
+            return;
+        }
+
+        if (acfFile)
+        {
+            std::vector<uint8_t> decodedAcf;
+            std::string sDecodedAcf;
+            if (!crow::utility::base64Decode(*acfFile, sDecodedAcf))
             {
-                BMCWEB_LOG_WARNING("Illegal Property ");
-                messages::propertyMissing(asyncResp->res, "ACF");
+                BMCWEB_LOG_ERROR("base64 decode failure ");
+                messages::internalError(asyncResp->res);
                 return;
             }
-            if (acf && (username == "service"))
+            try
             {
-                std::vector<uint8_t> decodedAcf;
-                std::optional<std::string> acfFile;
-                if (acf.value().contains("ACFFile") &&
-                    acf.value()["ACFFile"] == nullptr)
-                {
-                    acfFile = "";
-                }
-                else
-                {
-                    if (!redfish::json_util::readJsonObject(
-                            *acf, asyncResp->res, "ACFFile", acfFile))
-                    {
-                        BMCWEB_LOG_WARNING("Illegal Property ");
-                        messages::propertyMissing(asyncResp->res, "ACFFile");
-                        return;
-                    }
-
-                    std::string sDecodedAcf;
-                    if (!crow::utility::base64Decode(*acfFile, sDecodedAcf))
-                    {
-                        BMCWEB_LOG_ERROR("base64 decode failure ");
-                        messages::internalError(asyncResp->res);
-                        return;
-                    }
-                    try
-                    {
-                        std::copy(sDecodedAcf.begin(), sDecodedAcf.end(),
-                                  std::back_inserter(decodedAcf));
-                    }
-                    catch (const std::exception& e)
-                    {
-                        BMCWEB_LOG_ERROR("{}", e.what());
-                        messages::internalError(asyncResp->res);
-                        return;
-                    }
-                }
-
-                uploadACF(asyncResp, decodedAcf);
+                std::copy(sDecodedAcf.begin(), sDecodedAcf.end(),
+                          std::back_inserter(decodedAcf));
             }
-            else if (acf && (username != "service"))
+            catch (const std::exception& e)
             {
-                messages::resourceAtUriUnauthorized(
-                    asyncResp->res, req.url(),
-                    "ACF properties access not allowed by non service "
-                    "user");
+                BMCWEB_LOG_ERROR("{}", e.what());
+                messages::internalError(asyncResp->res);
+                return;
             }
+            uploadACF(asyncResp, decodedAcf);
+        }
+
+        if (allowUnauthACFUpload)
+        {
+            setPropertyAllowUnauthACFUpload(asyncResp, *allowUnauthACFUpload);
         }
     }
 
