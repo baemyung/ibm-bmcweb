@@ -34,7 +34,7 @@ namespace messages
  * @param[in] arg1 Parameter of message that will replace %1 in its body.
  *
  * @returns Message LicenseInstalled formatted to JSON */
-nlohmann::json licenseInstalled(std::string_view arg1);
+nlohmann::json::object_t licenseInstalled(std::string_view arg1);
 
 void licenseInstalled(crow::Response& res, std::string_view arg1);
 
@@ -46,8 +46,8 @@ void licenseInstalled(crow::Response& res, std::string_view arg1);
  * @param[in] arg2 Parameter of message that will replace %2 in its body.
  *
  * @returns Message DaysBeforeExpiration formatted to JSON */
-nlohmann::json daysBeforeExpiration(std::string_view arg1,
-                                    std::string_view arg2);
+nlohmann::json::object_t daysBeforeExpiration(std::string_view arg1,
+                                              std::string_view arg2);
 
 void daysBeforeExpiration(crow::Response& res, std::string_view arg1,
                           std::string_view arg2);
@@ -61,7 +61,8 @@ void daysBeforeExpiration(crow::Response& res, std::string_view arg1,
  * @param[in] arg2 Parameter of message that will replace %2 in its body.
  *
  * @returns Message GracePeriod formatted to JSON */
-nlohmann::json gracePeriod(std::string_view arg1, std::string_view arg2);
+nlohmann::json::object_t gracePeriod(std::string_view arg1,
+                                     std::string_view arg2);
 
 void gracePeriod(crow::Response& res, std::string_view arg1,
                  std::string_view arg2);
@@ -73,7 +74,7 @@ void gracePeriod(crow::Response& res, std::string_view arg1,
  * @param[in] arg1 Parameter of message that will replace %1 in its body.
  *
  * @returns Message Expired formatted to JSON */
-nlohmann::json expired(std::string_view arg1);
+nlohmann::json::object_t expired(std::string_view arg1);
 
 void expired(crow::Response& res, std::string_view arg1);
 
@@ -84,7 +85,7 @@ void expired(crow::Response& res, std::string_view arg1);
  * @param[in] arg1 Parameter of message that will replace %1 in its body.
  *
  * @returns Message InstallFailed formatted to JSON */
-nlohmann::json installFailed(std::string_view arg1);
+nlohmann::json::object_t installFailed(std::string_view arg1);
 
 void installFailed(crow::Response& res, std::string_view arg1);
 
@@ -95,7 +96,7 @@ void installFailed(crow::Response& res, std::string_view arg1);
  *
  *
  * @returns Message InvalidLicense formatted to JSON */
-nlohmann::json invalidLicense();
+nlohmann::json::object_t invalidLicense();
 
 void invalidLicense(crow::Response& res);
 
@@ -105,7 +106,7 @@ void invalidLicense(crow::Response& res);
  *
  *
  * @returns Message NotApplicableToTarget formatted to JSON */
-nlohmann::json notApplicableToTarget();
+nlohmann::json::object_t notApplicableToTarget();
 
 void notApplicableToTarget(crow::Response& res);
 
@@ -115,7 +116,7 @@ void notApplicableToTarget(crow::Response& res);
  *
  *
  * @returns Message TargetsRequired formatted to JSON */
-nlohmann::json targetsRequired();
+nlohmann::json::object_t targetsRequired();
 
 void targetsRequired(crow::Response& res);
 
