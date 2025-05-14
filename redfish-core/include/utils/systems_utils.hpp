@@ -9,13 +9,11 @@
 #include "error_messages.hpp"
 #include "human_sort.hpp"
 #include "logging.hpp"
-#include "utility.hpp"
 
 #include <asm-generic/errno.h>
 
 #include <boost/system/error_code.hpp>
 #include <boost/url/format.hpp>
-#include <boost/url/url.hpp>
 #include <sdbusplus/message/native_types.hpp>
 
 #include <algorithm>
@@ -151,10 +149,9 @@ inline void handleSystemCollectionMembers(
 
     for (const std::string& systemName : pathNames)
     {
-        boost::urls::url url("/redfish/v1/Systems");
-        crow::utility::appendUrlPieces(url, systemName);
         nlohmann::json::object_t member;
-        member["@odata.id"] = std::move(url);
+        member["@odata.id"] =
+            boost::urls::format("/redfish/v1/Systems/{}", systemName);
         membersArray.emplace_back(std::move(member));
     }
     asyncResp->res.jsonValue["Members@odata.count"] = membersArray.size();
