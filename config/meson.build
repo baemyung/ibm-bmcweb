@@ -26,7 +26,6 @@ feature_options = [
     'insecure-ignore-content-type',
     'insecure-push-style-notification',
     'kvm',
-    'meta-tls-common-name-parsing',
     'mutual-tls-auth',
     'redfish',
     'redfish-aggregation',
