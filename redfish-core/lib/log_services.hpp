@@ -2043,6 +2043,64 @@ inline void requestRoutesDBusEventLogEntryCollection(App& app)
             });
 }
 
+inline void afterDBusEventLogEntryGet(
+    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
+    const std::string& entryID, const boost::urls::url& urlLogEntryPrefix,
+    bool hidden, const boost::system::error_code& ec,
+    const dbus::utility::DBusPropertiesMap& resp)
+{
+    if (ec.value() == EBADR)
+    {
+        messages::resourceNotFound(asyncResp->res, "EventLogEntry", entryID);
+        return;
+    }
+    if (ec)
+    {
+        BMCWEB_LOG_ERROR("EventLogEntry (DBus) resp_handler got error {}", ec);
+        messages::internalError(asyncResp->res);
+        return;
+    }
+
+    // Check whether Hidden field exist
+    auto hiddenIter = std::ranges::find_if(
+        resp,
+        [](const std::pair<std::string, dbus::utility::DbusVariantType>& item) {
+            return item.first == "Hidden";
+        });
+    if (hiddenIter == resp.end())
+    {
+        // Skip the entry if Hidden field does not exist
+        // NOTE: Put this log trace to journal by default.
+        BMCWEB_LOG_ERROR("Skip the log entry {} as it has no Hidden property",
+                         entryID);
+        messages::resourceNotFound(asyncResp->res, "LogEntry", entryID);
+        return;
+    }
+
+    std::optional<DbusEventLogEntry> optEntry =
+        fillDbusEventLogEntryFromPropertyMap(resp);
+
+    if (!optEntry.has_value())
+    {
+        messages::internalError(asyncResp->res);
+        return;
+    }
+
+    const DbusEventLogEntry& entry = optEntry.value();
+
+    // Hidden logs are part of CELogs, ignore and continue.
+    // Or, Part of Event Logs, ignore and continue
+    if (hidden != entry.Hidden)
+    {
+        messages::resourceNotFound(asyncResp->res, "LogEntry",
+                                   std::to_string(entry.Id));
+        return;
+    }
+
+    fillEventLogLogEntryFromDbusLogEntry(urlLogEntryPrefix, entry,
+                                         asyncResp->res.jsonValue);
+}
+
 inline void dBusEventLogEntryGet(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp, std::string entryID,
     const boost::urls::url& urlLogEntryPrefix, bool hidden)
@@ -2054,62 +2112,8 @@ inline void dBusEventLogEntryGet(
     dbus::utility::getAllProperties(
         "xyz.openbmc_project.Logging",
         "/xyz/openbmc_project/logging/entry/" + entryID, "",
-        [asyncResp, entryID, urlLogEntryPrefix,
-         hidden](const boost::system::error_code& ec,
-                 const dbus::utility::DBusPropertiesMap& resp) {
-            if (ec.value() == EBADR)
-            {
-                messages::resourceNotFound(asyncResp->res, "EventLogEntry",
-                                           entryID);
-                return;
-            }
-            if (ec)
-            {
-                BMCWEB_LOG_ERROR(
-                    "EventLogEntry (DBus) resp_handler got error {}", ec);
-                messages::internalError(asyncResp->res);
-                return;
-            }
-
-            // Check whether Hidden field exist
-            auto hiddenIter = std::ranges::find_if(
-                resp,
-                [](const std::pair<std::string, dbus::utility::DbusVariantType>&
-                       item) { return item.first == "Hidden"; });
-            if (hiddenIter == resp.end())
-            {
-                // Skip the entry if Hidden field does not exist
-                // NOTE: Put this log trace to journal by default.
-                BMCWEB_LOG_ERROR(
-                    "Skip the log entry {} as it has no Hidden property",
-                    entryID);
-                messages::resourceNotFound(asyncResp->res, "LogEntry", entryID);
-                return;
-            }
-
-            std::optional<DbusEventLogEntry> optEntry =
-                fillDbusEventLogEntryFromPropertyMap(resp);
-
-            if (!optEntry.has_value())
-            {
-                messages::internalError(asyncResp->res);
-                return;
-            }
-
-            const DbusEventLogEntry& entry = optEntry.value();
-
-            // Hidden logs are part of CELogs, ignore and continue.
-            // Or, Part of Event Logs, ignore and continue
-            if (hidden != entry.Hidden)
-            {
-                messages::resourceNotFound(asyncResp->res, "LogEntry",
-                                           std::to_string(entry.Id));
-                return;
-            }
-
-            fillEventLogLogEntryFromDbusLogEntry(urlLogEntryPrefix, entry,
-                                                 asyncResp->res.jsonValue);
-        });
+        std::bind_front(afterDBusEventLogEntryGet, asyncResp, entryID,
+                        urlLogEntryPrefix, hidden));
 }
 
 inline void dBusEventLogEntryPatch(
