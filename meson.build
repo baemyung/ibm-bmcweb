@@ -373,6 +373,7 @@ srcfiles_bmcweb = files(
     'redfish-core/src/filter_expr_executor.cpp',
     'redfish-core/src/filter_expr_printer.cpp',
     'redfish-core/src/heartbeat_messages.cpp',
+    'redfish-core/src/license_messages.cpp',
     'redfish-core/src/oem_messages.cpp',
     'redfish-core/src/redfish.cpp',
     'redfish-core/src/registries.cpp',

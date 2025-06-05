@@ -1,4 +1,3 @@
-
 #include "oem_messages.hpp"
 
 #include "bmcweb_config.h"

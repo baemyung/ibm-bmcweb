@@ -230,7 +230,10 @@ def get_response_code(entry_id: str) -> str | None:
         "GenerateSecretKeyRequired": "forbidden",
         "InsufficientPrivilege": "forbidden",
         "InsufficientStorage": "insufficient_storage",
+        "InstallFailed": "internal_server_error",
         "InternalError": "internal_server_error",
+        "InvalidLicense": "bad_request",
+        "LicenseInstalled": "ok",
         "MaximumErrorsExceeded": "internal_server_error",
         "NoValidSession": "forbidden",
         "OperationFailed": "bad_gateway",
@@ -355,7 +358,7 @@ def make_error_function(
             arg_param = f"std::to_array{to_array_type}({{{argstring}}})"
         out += f"    return getLog(redfish::registries::{namespace_name}::Index::{function_name}, {arg_param});"
         out += "\n}\n\n"
-    if registry_name == "Base":
+    if registry_name == "Base" or registry_name == "License":
         args.insert(0, "crow::Response& res")
         if entry_id == "InternalError":
             if is_header:
@@ -464,7 +467,7 @@ namespace messages
                 message = message.replace(f"'%{index}'", f"<arg{index}>")
                 message = message.replace(f"%{index}", f"<arg{index}>")
 
-            if registry_name == "Base":
+            if registry_name == "Base" or registry_name == "License":
                 out.write("/**\n")
                 out.write(f"* @brief Formats {entry_id} message into JSON\n")
                 out.write(f'* Message body: "{message}"\n')
@@ -502,7 +505,6 @@ namespace messages
 
         headers.append('"registries.hpp"')
         if registry_name == "Base":
-            reg_name_lower = "base"
             headers.append('"error_message_utils.hpp"')
             headers.append('"http_response.hpp"')
             headers.append('"logging.hpp"')
@@ -510,8 +512,11 @@ namespace messages
             headers.append("<boost/beast/http/status.hpp>")
             headers.append("<boost/url/url_view_base.hpp>")
             headers.append("<source_location>")
-        else:
-            reg_name_lower = namespace_name.lower()
+        elif registry_name == "License":
+            headers.append('"error_message_utils.hpp"')
+            headers.append('"http_response.hpp"')
+            headers.append("<boost/beast/http/status.hpp>")
+        reg_name_lower = namespace_name.lower()
         headers.append(f'"registries/{reg_name_lower}_message_registry.hpp"')
 
         headers.append("<nlohmann/json.hpp>")
@@ -519,7 +524,7 @@ namespace messages
         headers.append("<cstddef>")
         headers.append("<span>")
 
-        if registry_name not in ("ResourceEvent", "HeartbeatEvent"):
+        if registry_name not in ("ResourceEvent", "HeartbeatEvent", "License"):
             headers.append("<cstdint>")
             headers.append("<string>")
         headers.append("<string_view>")
@@ -730,6 +735,13 @@ def main() -> None:
             "HeartbeatEvent",
             "heartbeat_event",
             "heartbeat",
+        )
+    if "license" in registries_map:
+        create_error_registry(
+            registries_map["license"],
+            "License",
+            "license",
+            "license",
         )
     if "resource_event" in registries_map:
         create_error_registry(

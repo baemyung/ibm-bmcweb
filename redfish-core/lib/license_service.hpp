@@ -3,19 +3,15 @@
 #include "async_resp.hpp"
 #include "dbus_singleton.hpp"
 #include "dbus_utility.hpp"
-#include "error_message_utils.hpp"
 #include "http_request.hpp"
 #include "http_response.hpp"
+#include "license_messages.hpp"
 #include "logging.hpp"
-#include "registries.hpp"
-#include "registries/base_message_registry.hpp"
-#include "registries/license_message_registry.hpp"
 #include "utils/time_utils.hpp"
 
 #include <app.hpp>
 #include <boost/asio/error.hpp>
 #include <boost/asio/steady_timer.hpp>
-#include <boost/beast/http/status.hpp>
 #include <boost/beast/http/verb.hpp>
 #include <boost/container/flat_map.hpp>
 #include <boost/url/format.hpp>
@@ -25,84 +21,15 @@
 #include <sdbusplus/message/native_types.hpp>
 #include <utils/json_utils.hpp>
 
-#include <array>
 #include <chrono>
-#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <memory>
-#include <span>
 #include <string>
 #include <string_view>
 #include <variant>
 namespace redfish
 {
-namespace messages
-{
-inline nlohmann::json getLicenseLog(redfish::registries::license::Index name,
-                                    std::span<const std::string_view> args)
-{
-    size_t index = static_cast<size_t>(name);
-    if (index >= redfish::registries::base::registry.size())
-    {
-        return {};
-    }
-    return getLogFromRegistry(redfish::registries::license::header,
-                              redfish::registries::license::registry, index,
-                              args);
-}
-
-inline nlohmann::json licenseInstalled(std::string_view arg1)
-{
-    return getLicenseLog(redfish::registries::license::Index::licenseInstalled,
-                         std::to_array({arg1}));
-}
-
-static void licenseInstalled(crow::Response& res,
-                             const std::string& licenseString)
-{
-    res.result(boost::beast::http::status::ok);
-    addMessageToJson(res.jsonValue, licenseInstalled(licenseString),
-                     "LicenseString");
-}
-
-inline nlohmann::json invalidLicense()
-{
-    return getLicenseLog(redfish::registries::license::Index::invalidLicense,
-                         {});
-}
-
-static void invalidLicense(crow::Response& res)
-{
-    res.result(boost::beast::http::status::bad_request);
-    addMessageToErrorJson(res.jsonValue, invalidLicense());
-}
-
-inline nlohmann::json installFailed(std::string_view arg1)
-{
-    return getLicenseLog(redfish::registries::license::Index::installFailed,
-                         std::to_array({arg1}));
-}
-
-static void installFailed(crow::Response& res, const std::string& reason)
-{
-    res.result(boost::beast::http::status::internal_server_error);
-    addMessageToErrorJson(res.jsonValue, installFailed(reason));
-}
-
-inline nlohmann::json notApplicableToTarget()
-{
-    return getLicenseLog(
-        redfish::registries::license::Index::notApplicableToTarget, {});
-}
-
-static void notApplicableToTarget(crow::Response& res)
-{
-    res.result(boost::beast::http::status::bad_request);
-    addMessageToErrorJson(res.jsonValue, notApplicableToTarget());
-}
-
-} // namespace messages
 
 static std::unique_ptr<sdbusplus::bus::match::match>&
     getLicenseActivationStatusMatch()
@@ -228,7 +155,8 @@ inline void getLicenseActivationAck(
     if (status == "com.ibm.License.LicenseManager.Status.ActivationFailed")
     {
         BMCWEB_LOG_WARNING("LicenseActivationStatus: ActivationFailed");
-        messages::installFailed(asyncResp->res, "ActivationFailed");
+        messages::installFailed(asyncResp->res,
+                                std::string_view("ActivationFailed"));
     }
     else if (status == "com.ibm.License.LicenseManager.Status.InvalidLicense")
     {
@@ -249,7 +177,8 @@ inline void getLicenseActivationAck(
     else if (status == "com.ibm.License.LicenseManager.Status.InvalidHostState")
     {
         BMCWEB_LOG_WARNING("LicenseActivationStatus: InvalidHostState");
-        messages::installFailed(asyncResp->res, "InvalidHostState");
+        messages::installFailed(asyncResp->res,
+                                std::string_view("InvalidHostState"));
     }
     else if (status == "com.ibm.License.LicenseManager.Status.Activated")
     {
