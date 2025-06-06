@@ -1024,8 +1024,8 @@ inline void createDumpTaskCallback(
             // The task timer is set to max time limit within which the
             // requested dump will be collected.
             task->startTimer(std::chrono::minutes(20));
-            task->populateResp(asyncResp->res);
             task->payload.emplace(payload);
+            task->populateResp(asyncResp->res);
         },
         "xyz.openbmc_project.Dump.Manager", createdObjPath,
         "org.freedesktop.DBus.Introspectable", "Introspect");
@@ -3545,8 +3545,8 @@ inline void requestRoutesCrashdumpCollect(App& app)
                                 taskMatchStr);
 
                         task->startTimer(std::chrono::minutes(5));
-                        task->populateResp(asyncResp->res);
                         task->payload.emplace(std::move(payload));
+                        task->populateResp(asyncResp->res);
                     };
 
                 dbus::utility::async_method_call(
