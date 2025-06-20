@@ -120,7 +120,7 @@ inline void afterGetProperties(
         return;
     }
 
-    if (version == nullptr || version->empty())
+    if (version == nullptr)
     {
         messages::internalError(asyncResp->res);
         return;
@@ -161,6 +161,11 @@ inline void afterGetProperties(
     }
     if (!activeVersionPropName.empty() && runningImage)
     {
+        if (version->empty())
+        {
+            BMCWEB_LOG_INFO("Version is empty for swId: {}", swId);
+            return;
+        }
         asyncResp->res.jsonValue[activeVersionPropName] = *version;
     }
 }
