@@ -7,6 +7,7 @@
 #include "error_messages.hpp"
 #include "http_request.hpp"
 #include "http_response.hpp"
+#include "human_sort.hpp"
 #include "logging.hpp"
 #include "query.hpp"
 #include "registries/privilege_registry.hpp"
@@ -17,6 +18,7 @@
 #include <boost/beast/http/verb.hpp>
 #include <boost/url/format.hpp>
 
+#include <algorithm>
 #include <array>
 #include <filesystem>
 #include <format>
@@ -99,7 +101,6 @@ inline void jsonSchemaIndexGet(
     json["@odata.type"] = "#JsonSchemaFileCollection.JsonSchemaFileCollection";
     json["Name"] = "JsonSchemaFile Collection";
     json["Description"] = "Collection of JsonSchemaFiles";
-    nlohmann::json::array_t members;
 
     std::error_code ec;
     std::filesystem::directory_iterator dirList(
@@ -109,6 +110,8 @@ inline void jsonSchemaIndexGet(
         messages::internalError(asyncResp->res);
         return;
     }
+
+    std::vector<std::string> schemaNames;
     for (const std::filesystem::path& file : dirList)
     {
         std::string filename = file.filename();
@@ -118,12 +121,18 @@ inline void jsonSchemaIndexGet(
         {
             continue;
         }
+        schemaNames.emplace_back(split[0]);
+    }
+    std::ranges::sort(schemaNames, AlphanumLess<std::string>());
+
+    nlohmann::json::array_t members;
+    for (const std::string& schema : schemaNames)
+    {
         nlohmann::json::object_t member;
         member["@odata.id"] =
-            boost::urls::format("/redfish/v1/JsonSchemas/{}", split[0]);
+            boost::urls::format("/redfish/v1/JsonSchemas/{}", schema);
         members.emplace_back(std::move(member));
     }
-
     json["Members@odata.count"] = members.size();
     json["Members"] = std::move(members);
 }
