@@ -24,6 +24,7 @@
 #include "registries/privilege_registry.hpp"
 #include "utils/dbus_utils.hpp"
 #include "utils/json_utils.hpp"
+#include "utils/manager_utils.hpp"
 #include "utils/sw_utils.hpp"
 #include "utils/systemd_utils.hpp"
 #include "utils/time_utils.hpp"
@@ -846,7 +847,7 @@ inline void requestRoutesManager(App& app)
             asyncResp->res.jsonValue["@odata.id"] = boost::urls::format(
                 "/redfish/v1/Managers/{}", BMCWEB_REDFISH_MANAGER_URI_NAME);
             asyncResp->res.jsonValue["@odata.type"] =
-                "#Manager.v1_14_0.Manager";
+                "#Manager.v1_15_0.Manager";
             asyncResp->res.jsonValue["Id"] = BMCWEB_REDFISH_MANAGER_URI_NAME;
             asyncResp->res.jsonValue["Name"] = "OpenBmc Manager";
             asyncResp->res.jsonValue["Description"] =
@@ -869,6 +870,8 @@ inline void requestRoutesManager(App& app)
                 boost::urls::format(
                     "/redfish/v1/Managers/{}/EthernetInterfaces",
                     BMCWEB_REDFISH_MANAGER_URI_NAME);
+
+            manager_utils::getServiceIdentification(asyncResp, false);
 
             if constexpr (BMCWEB_VM_NBDPROXY)
             {
@@ -999,6 +1002,7 @@ inline void requestRoutesManager(App& app)
                 std::optional<nlohmann::json::object_t> stepwiseControllers;
                 std::optional<std::string> profile;
                 std::optional<bool> usbCodeUpdateEnabled;
+                std::optional<std::string> serviceIdentification;
 
                 if (!json_util::readJsonPatch(                            //
                         req, asyncResp->res,                              //
@@ -1014,7 +1018,8 @@ inline void requestRoutesManager(App& app)
                         "Oem/OpenBmc/Fan/StepwiseControllers",
                         stepwiseControllers,                              //
                         "Oem/IBM/USBCodeUpdateEnabled",
-                        usbCodeUpdateEnabled                              //
+                        usbCodeUpdateEnabled,                             //
+                        "ServiceIdentification", serviceIdentification    //
                         ))
                 {
                     return;
@@ -1048,6 +1053,12 @@ inline void requestRoutesManager(App& app)
                 {
                     setLocationIndicatorActiveState(
                         asyncResp, *locationIndicatorActive, managerId);
+                }
+
+                if (serviceIdentification)
+                {
+                    manager_utils::setServiceIdentification(
+                        asyncResp, serviceIdentification.value());
                 }
 
                 RedfishService::getInstance(app).handleSubRoute(req, asyncResp);

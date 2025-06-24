@@ -16,6 +16,7 @@
 #include "query.hpp"
 #include "registries/privilege_registry.hpp"
 #include "utils/dbus_utils.hpp"
+#include "utils/manager_utils.hpp"
 
 #include <asm-generic/errno.h>
 
@@ -262,6 +263,7 @@ inline void handleServiceRootGetImpl(
         "/redfish/v1/EventService";
     asyncResp->res.jsonValue["TelemetryService"]["@odata.id"] =
         "/redfish/v1/TelemetryService";
+    manager_utils::getServiceIdentification(asyncResp, true);
     asyncResp->res.jsonValue["Cables"]["@odata.id"] = "/redfish/v1/Cables";
     if constexpr (BMCWEB_REDFISH_LICENSE)
     {
