@@ -36,6 +36,7 @@
 #include <functional>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -759,28 +760,33 @@ inline void fillSystemHardwareIsolationLogEntry(
 
                             std::string entryID = errPath.filename();
 
-                            auto updateAdditionalDataURI = [asyncResp,
-                                                            entryJsonIdx,
-                                                            entryID](
-                                                               bool hidden) {
-                                nlohmann::json& entryJsonToupdateURI =
-                                    (entryJsonIdx > 0
-                                         ? asyncResp->res
-                                               .jsonValue["Members"]
-                                                         [entryJsonIdx - 1]
-                                         : asyncResp->res.jsonValue);
-                                std::string logPath = "EventLog";
+                            auto updateAdditionalDataURI = //
+                                [asyncResp, entryJsonIdx,
+                                 entryID](const std::optional<bool>& hidden) {
+                                    if (!hidden.has_value())
+                                    {
+                                        // Skip log entry if Hidden dbus
+                                        // property is missing
+                                        return;
+                                    }
+                                    nlohmann::json& entryJsonToupdateURI =
+                                        (entryJsonIdx > 0
+                                             ? asyncResp->res
+                                                   .jsonValue["Members"]
+                                                             [entryJsonIdx - 1]
+                                             : asyncResp->res.jsonValue);
 
-                                if (hidden)
-                                {
-                                    logPath = "CELog";
-                                }
-                                entryJsonToupdateURI["AdditionalDataURI"] =
-                                    boost::urls::format(
-                                        "/redfish/v1/Systems/{}/LogServices/{}/Entries/{}/attachment",
-                                        BMCWEB_REDFISH_SYSTEM_URI_NAME, logPath,
-                                        entryID);
-                            };
+                                    std::string logPath = "EventLog";
+                                    if (*hidden)
+                                    {
+                                        logPath = "CELog";
+                                    }
+                                    entryJsonToupdateURI["AdditionalDataURI"] =
+                                        boost::urls::format(
+                                            "/redfish/v1/Systems/{}/LogServices/{}/Entries/{}/attachment",
+                                            BMCWEB_REDFISH_SYSTEM_URI_NAME,
+                                            logPath, entryID);
+                                };
                             redfish::error_log_utils::getHiddenPropertyValue(
                                 asyncResp, entryID, updateAdditionalDataURI);
                         }

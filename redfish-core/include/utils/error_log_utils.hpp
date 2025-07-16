@@ -11,6 +11,8 @@
 #include "error_messages.hpp"
 #include "logging.hpp"
 
+#include <asm-generic/errno.h>
+
 #include <boost/system/error_code.hpp>
 #include <boost/url/format.hpp>
 #include <boost_formatters.hpp>
@@ -19,6 +21,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -29,7 +32,8 @@ namespace error_log_utils
 
 static void getHiddenPropertyValue(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-    const std::string& entryId, std::function<void(bool hidden)>&& callback)
+    const std::string& entryId,
+    std::function<void(const std::optional<bool>& hidden)>&& callback)
 {
     // Explicit move here to avoid clang tidy warning
     auto movedCallback = std::move(callback);
@@ -42,6 +46,15 @@ static void getHiddenPropertyValue(
          entryId](const boost::system::error_code& ec, bool hidden) {
             if (ec)
             {
+                if (ec.value() == EBADR)
+                {
+                    // Put this log trace to journal by default.
+                    BMCWEB_LOG_ERROR(
+                        "DBUS property 'Hidden' for entry {} does not exist",
+                        entryId);
+                    movedCallback(std::nullopt);
+                    return;
+                }
                 BMCWEB_LOG_ERROR(
                     "Failed to get DBUS property 'Hidden' for entry {}: {}",
                     entryId, ec);
@@ -79,24 +92,29 @@ inline void setErrorLogUri(
     const nlohmann::json::json_pointer& errorLogPropPath, const bool isLink)
 {
     std::string entryID = errorLogObjPath.filename();
-    auto updateErrorLogPath =
-        [asyncResp, entryID, errorLogPropPath, isLink](bool hidden) {
-            std::string logPath = "EventLog";
-            if (hidden)
-            {
-                logPath = "CELog";
-            }
-            std::string linkAttachment;
-            if (!isLink)
-            {
-                linkAttachment = "/attachment";
-            }
-            asyncResp->res.jsonValue[errorLogPropPath]["@odata.id"] =
-                boost::urls::format(
-                    "/redfish/v1/Systems/{}/LogServices/{}/Entries/{}{}",
-                    BMCWEB_REDFISH_SYSTEM_URI_NAME, logPath, entryID,
-                    linkAttachment);
-        };
+    auto updateErrorLogPath = [asyncResp, entryID, errorLogPropPath,
+                               isLink](const std::optional<bool>& hidden) {
+        if (!hidden.has_value())
+        {
+            // Skip log entry if Hidden dbus property is missing
+            return;
+        }
+        std::string logPath = "EventLog";
+        if (*hidden)
+        {
+            logPath = "CELog";
+        }
+        std::string linkAttachment;
+        if (!isLink)
+        {
+            linkAttachment = "/attachment";
+        }
+        asyncResp->res.jsonValue[errorLogPropPath]["@odata.id"] =
+            boost::urls::format(
+                "/redfish/v1/Systems/{}/LogServices/{}/Entries/{}{}",
+                BMCWEB_REDFISH_SYSTEM_URI_NAME, logPath, entryID,
+                linkAttachment);
+    };
     getHiddenPropertyValue(asyncResp, entryID, updateErrorLogPath);
 }
 

@@ -1742,6 +1742,22 @@ inline void afterLogEntriesGetManagedObjects(
                                             propertyMap.second);
             }
         }
+
+        // Check whether Hidden field exist
+        auto hiddenIter = std::ranges::find_if(
+            propsFlattened,
+            [](const std::pair<std::string, dbus::utility::DbusVariantType>&
+                   item) { return item.first == "Hidden"; });
+        if (hiddenIter == propsFlattened.end())
+        {
+            // Skip the entry if Hidden field does not exist
+            // NOTE: Put this log trace to journal by default.
+            BMCWEB_LOG_ERROR(
+                "Skip the log entry {} as it has no Hidden property",
+                objectPath.first.str);
+            continue;
+        }
+
         std::optional<DbusEventLogEntry> optEntry =
             fillDbusEventLogEntryFromPropertyMap(propsFlattened);
 
@@ -2045,6 +2061,22 @@ inline void dBusEventLogEntryGet(
                 BMCWEB_LOG_ERROR(
                     "EventLogEntry (DBus) resp_handler got error {}", ec);
                 messages::internalError(asyncResp->res);
+                return;
+            }
+
+            // Check whether Hidden field exist
+            auto hiddenIter = std::ranges::find_if(
+                resp,
+                [](const std::pair<std::string, dbus::utility::DbusVariantType>&
+                       item) { return item.first == "Hidden"; });
+            if (hiddenIter == resp.end())
+            {
+                // Skip the entry if Hidden field does not exist
+                // NOTE: Put this log trace to journal by default.
+                BMCWEB_LOG_ERROR(
+                    "Skip the log entry {} as it has no Hidden property",
+                    entryID);
+                messages::resourceNotFound(asyncResp->res, "LogEntry", entryID);
                 return;
             }
 
@@ -2604,8 +2636,9 @@ inline void handleDBusEventLogEntryDownloadGet(
 
     redfish::error_log_utils::getHiddenPropertyValue(
         asyncResp, entryID,
-        [asyncResp, entryID, systemName, dumpType, hidden](bool hiddenPropVal) {
-            if (hiddenPropVal != hidden)
+        [asyncResp, entryID, systemName, dumpType,
+         hidden](const std::optional<bool>& hiddenPropVal) {
+            if (hiddenPropVal.value_or(!hidden) != hidden)
             {
                 messages::resourceNotFound(asyncResp->res, "LogEntry", entryID);
                 return;
@@ -2779,8 +2812,9 @@ inline void requestRoutesDBusEventLogEntryDownloadPelJson(App& app)
 
                 redfish::error_log_utils::getHiddenPropertyValue(
                     asyncResp, entryID,
-                    [asyncResp, entryID](bool hiddenPropVal) {
-                        if (hiddenPropVal)
+                    [asyncResp,
+                     entryID](const std::optional<bool>& hiddenPropVal) {
+                        if (hiddenPropVal.value_or(true))
                         {
                             messages::resourceNotFound(asyncResp->res,
                                                        "LogEntry", entryID);

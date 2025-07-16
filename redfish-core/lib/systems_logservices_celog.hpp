@@ -192,8 +192,8 @@ inline void dBusCELogEntryPatch(
     error_log_utils::getHiddenPropertyValue(
         asyncResp, entryId,
         [resolved, managementSystemAck, asyncResp,
-         entryId](bool hiddenPropVal) {
-            if (!hiddenPropVal)
+         entryId](const std::optional<bool>& hiddenPropVal) {
+            if (!hiddenPropVal.value_or(false))
             {
                 messages::resourceNotFound(asyncResp->res, "LogEntry", entryId);
                 return;
@@ -210,8 +210,9 @@ inline void dBusCELogEntryDelete(
     dbus::utility::escapePathForDbus(entryID);
 
     error_log_utils::getHiddenPropertyValue(
-        asyncResp, entryID, [asyncResp, entryID](bool hiddenPropVal) {
-            if (!hiddenPropVal)
+        asyncResp, entryID,
+        [asyncResp, entryID](const std::optional<bool>& hiddenPropVal) {
+            if (!hiddenPropVal.value_or(false))
             {
                 messages::resourceNotFound(asyncResp->res, "LogEntry", entryID);
                 return;
@@ -351,8 +352,9 @@ inline void requestRoutesDBusCELogEntryDownloadPelJson(App& app)
 
                 error_log_utils::getHiddenPropertyValue(
                     asyncResp, entryID,
-                    [asyncResp, entryID](bool hiddenPropVal) {
-                        if (!hiddenPropVal)
+                    [asyncResp,
+                     entryID](const std::optional<bool>& hiddenPropVal) {
+                        if (!hiddenPropVal.value_or(false))
                         {
                             messages::resourceNotFound(asyncResp->res,
                                                        "LogEntry", entryID);
