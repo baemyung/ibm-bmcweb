@@ -118,12 +118,6 @@ class Server
             }
             else
             {
-                if (signalNo == SIGHUP)
-                {
-                    BMCWEB_LOG_INFO("Receivied reload signal");
-                    loadCertificate();
-                    startAsyncWaitForSignal();
-                }
                 if constexpr (BMCWEB_IBM_MANAGEMENT_CONSOLE)
                 {
                     if (signalNo == SIGUSR1)
@@ -132,7 +126,15 @@ class Server
                             "INFO: Receivied USR1 signal to dump latest session  data for bmc dump");
                         persistent_data::getConfig().writeCurrentSessionData();
                         this->startAsyncWaitForSignal();
+                        return;
                     }
+                }
+
+                if (signalNo == SIGHUP)
+                {
+                    BMCWEB_LOG_INFO("Receivied reload signal");
+                    loadCertificate();
+                    startAsyncWaitForSignal();
                 }
                 else
                 {
