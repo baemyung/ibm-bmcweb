@@ -1325,8 +1325,14 @@ inline void handleHypervisorPatchFromIfaceData(
         }
 
         const auto& firstGateway = ipv6StaticDefaultGateways->front();
-        handleHypervisorV6DefaultGatewayPatch(
-            ifaceId, firstGateway.is_null() ? "::" : firstGateway, asyncResp);
+        std::string firstGatewayStr = "::";
+        if (!firstGateway.is_null() &&
+            firstGateway.get_ptr<const std::string*>() != nullptr)
+        {
+            firstGatewayStr = *firstGateway.get_ptr<const std::string*>();
+        }
+        handleHypervisorV6DefaultGatewayPatch(ifaceId, firstGatewayStr,
+                                              asyncResp);
     }
 }
 

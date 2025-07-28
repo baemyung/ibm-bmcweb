@@ -316,7 +316,7 @@ inline void linkAssociatedProcessor(
             item["@odata.id"] = boost::urls::format(
                 "/redfish/v1/Systems/system/Processors/{}", processorName);
 
-            nlohmann::json::array_t processorArray = nlohmann::json::array();
+            nlohmann::json processorArray = nlohmann::json::array();
             processorArray.emplace_back(std::move(item));
 
             asyncResp->res

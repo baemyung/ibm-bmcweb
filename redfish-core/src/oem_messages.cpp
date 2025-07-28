@@ -50,7 +50,8 @@ nlohmann::json::object_t taskAborted(
         msgId = std::format("{}.{}.{}.{}", header.registryPrefix,
                             header.versionMajor, header.versionMinor, msgName);
     }
-    return nlohmann::json{
+
+    return nlohmann::json::object_t{
         {"@odata.type", "#Message.v1_0_0.Message"},
         {"MessageId", msgId},
         {"Message", "The task with id " + arg1 + " has been aborted."},

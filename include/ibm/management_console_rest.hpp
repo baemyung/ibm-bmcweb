@@ -563,7 +563,7 @@ inline void handleBroadcastService(
     }
 
     std::string origin = "/ibm/v1/HMC/BroadcastService";
-    nlohmann::json msgJson = {{"Message", broadcastMsg}};
+    nlohmann::json::object_t msgJson = {{"Message", broadcastMsg}};
 
     redfish::EventServiceManager::getInstance().sendEvent(
         msgJson, origin, "BroadcastService");

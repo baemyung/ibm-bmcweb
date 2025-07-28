@@ -489,19 +489,19 @@ inline void handleBiosSettingsPatch(
                                    systemName);
         return;
     }
-    nlohmann::json attrsJson;
 
+    nlohmann::json attrsJsonData;
     if (!redfish::json_util::readJsonPatch(req, asyncResp->res, "Attributes",
-                                           attrsJson))
+                                           attrsJsonData))
     {
         return;
     }
 
-    if (attrsJson.is_array())
+    if (attrsJsonData.is_array())
     {
         BMCWEB_LOG_WARNING(
             "The value for 'Attributes' is in a different format");
-        messages::propertyValueFormatError(asyncResp->res, attrsJson.dump(),
+        messages::propertyValueFormatError(asyncResp->res, attrsJsonData.dump(),
                                            "Attributes");
         return;
     }
@@ -510,7 +510,7 @@ inline void handleBiosSettingsPatch(
         "xyz.openbmc_project.BIOSConfigManager",
         "/xyz/openbmc_project/bios_config/manager",
         "xyz.openbmc_project.BIOSConfig.Manager", "BaseBIOSTable",
-        [asyncResp, attrsJson,
+        [asyncResp, attrsJsonData,
          systemName](const boost::system::error_code& ec,
                      const BiosBaseTableType& baseBiosTable) {
             if (ec)
@@ -581,9 +581,13 @@ inline void handleBiosSettingsPatch(
             }
 
             PendingAttributesType pendingAttributes;
-            for (const auto& attrItr : attrsJson.items())
+
+            const nlohmann::json::object_t* attrsJson =
+                attrsJsonData.get_ptr<const nlohmann::json::object_t*>();
+
+            for (const auto& attrItr : *attrsJson)
             {
-                const std::string& attrName = attrItr.key();
+                const std::string& attrName = attrItr.first;
 
                 if (attrName.empty())
                 {
@@ -621,17 +625,17 @@ inline void handleBiosSettingsPatch(
                     mapAttrTypeToRedfish(biosAttrType);
                 if (biosRedfishAttrType == "Integer")
                 {
-                    if (attrItr.value().type() !=
-                        nlohmann::json::value_t::number_unsigned)
+                    const int64_t* attrValue =
+                        attrItr.second.get_ptr<const int64_t*>();
+                    if (attrValue != nullptr)
                     {
                         BMCWEB_LOG_WARNING("The value must be of type int");
                         std::string val =
-                            boost::lexical_cast<std::string>(attrItr.value());
+                            boost::lexical_cast<std::string>(attrItr.second);
                         messages::propertyValueTypeError(asyncResp->res, val,
                                                          attrName);
                         return;
                     }
-                    const int64_t& attrValue = attrItr.value();
 
                     boost::container::flat_map<
                         std::string, std::variant<int64_t, std::string>>
@@ -654,27 +658,29 @@ inline void handleBiosSettingsPatch(
                         upperBoundVal = std::get<int64_t>((*iter).second);
                     }
 
-                    if (attrValue < lowerBoundVal || attrValue > upperBoundVal)
+                    if (*attrValue < lowerBoundVal ||
+                        *attrValue > upperBoundVal)
                     {
                         BMCWEB_LOG_ERROR("Attribute value is out of range");
                         std::string val =
-                            boost::lexical_cast<std::string>(attrItr.value());
+                            boost::lexical_cast<std::string>(attrItr.second);
                         messages::propertyValueOutOfRange(asyncResp->res, val,
                                                           attrName);
                         return;
                     }
 
                     pendingAttributes.emplace_back(std::make_pair(
-                        attrName, std::make_tuple(biosAttrType, attrValue)));
+                        attrName, std::make_tuple(biosAttrType, *attrValue)));
                 }
                 else if (biosRedfishAttrType == "String")
                 {
-                    if (attrItr.value().type() !=
-                        nlohmann::json::value_t::string)
+                    const std::string* attrValue =
+                        attrItr.second.get_ptr<const std::string*>();
+                    if (attrValue != nullptr)
                     {
                         BMCWEB_LOG_ERROR("The value must be of type String");
                         std::string val =
-                            boost::lexical_cast<std::string>(attrItr.value());
+                            boost::lexical_cast<std::string>(*attrValue);
                         messages::propertyValueTypeError(asyncResp->res, val,
                                                          attrName);
                         return;
@@ -699,9 +705,8 @@ inline void handleBiosSettingsPatch(
                     {
                         maxStringLength = std::get<int64_t>((*iter).second);
                     }
-                    const std::string& attrValue = attrItr.value();
                     const int64_t attrValueLength =
-                        static_cast<int64_t>(attrValue.length());
+                        static_cast<int64_t>(attrValue->length());
                     if (attrValueLength < minStringLength ||
                         attrValueLength > maxStringLength)
                     {
@@ -709,44 +714,44 @@ inline void handleBiosSettingsPatch(
                                          "incorrect for {}",
                                          attrName);
                         messages::propertyValueIncorrect(asyncResp->res,
-                                                         attrName, attrValue);
+                                                         attrName, *attrValue);
                         return;
                     }
                     pendingAttributes.emplace_back(std::make_pair(
-                        attrName, std::make_tuple(biosAttrType, attrValue)));
+                        attrName, std::make_tuple(biosAttrType, *attrValue)));
                 }
                 else if (biosRedfishAttrType == "Enumeration" ||
                          biosRedfishAttrType == "Password")
                 {
-                    if (attrItr.value().type() !=
-                        nlohmann::json::value_t::string)
+                    const std::string* attrValue =
+                        attrItr.second.get_ptr<const std::string*>();
+                    if (attrValue != nullptr)
                     {
                         BMCWEB_LOG_WARNING("The value must be of type string");
                         std::string val =
-                            boost::lexical_cast<std::string>(attrItr.value());
+                            boost::lexical_cast<std::string>(*attrValue);
                         messages::propertyValueTypeError(asyncResp->res, val,
                                                          attrName);
                         return;
                     }
-                    std::string attrValue = attrItr.value();
                     pendingAttributes.emplace_back(std::make_pair(
-                        attrName, std::make_tuple(biosAttrType, attrValue)));
+                        attrName, std::make_tuple(biosAttrType, *attrValue)));
                 }
                 else if (biosRedfishAttrType == "Boolean")
                 {
-                    if (attrItr.value().type() !=
-                        nlohmann::json::value_t::boolean)
+                    const bool* attrValue =
+                        attrItr.second.get_ptr<const bool*>();
+                    if (attrValue != nullptr)
                     {
                         BMCWEB_LOG_WARNING("The value must be of type bool");
                         std::string val =
-                            boost::lexical_cast<std::string>(attrItr.value());
+                            boost::lexical_cast<std::string>(*attrValue);
                         messages::propertyValueTypeError(asyncResp->res, val,
                                                          attrName);
                         return;
                     }
-                    bool attrValue = attrItr.value();
                     pendingAttributes.emplace_back(std::make_pair(
-                        attrName, std::make_tuple(biosAttrType, attrValue)));
+                        attrName, std::make_tuple(biosAttrType, *attrValue)));
                 }
                 else
                 {
