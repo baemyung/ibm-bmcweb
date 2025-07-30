@@ -4,6 +4,7 @@
 #include "bmcweb_config.h"
 
 #include "async_resp.hpp"
+#include "audit_events.hpp"
 #include "authentication.hpp"
 #include "complete_response_fields.hpp"
 #include "forward_unauthorized.hpp"
@@ -205,6 +206,27 @@ class HTTP2Connection :
         Http2StreamData& stream = it->second;
         Response& res = stream.res;
         res = std::move(completedRes);
+
+        if constexpr (BMCWEB_AUDIT_EVENTS)
+        {
+            if (stream.req != nullptr && audit::wantAudit(*stream.req))
+            {
+                bool requestSuccess = false;
+                // Look for good return codes and if so we know the
+                // operation passed
+                if ((res.resultInt() >= 200) && (res.resultInt() < 300))
+                {
+                    requestSuccess = true;
+                }
+
+                std::string username;
+                if (stream.req->session != nullptr)
+                {
+                    username = stream.req->session->username;
+                }
+                audit::auditEvent(*stream.req, username, requestSuccess);
+            }
+        }
 
         completeResponseFields(stream.accept, res);
         res.addHeader(boost::beast::http::field::date, getCachedDateStr());
