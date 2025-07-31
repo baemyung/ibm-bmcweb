@@ -51,12 +51,16 @@ class RedfishService
         const crow::Request& req,
         const std::shared_ptr<bmcweb::AsyncResp>& asyncResp) const
     {
+        BMCWEB_LOG_ERROR("TEST: handleSubRoute ENTERED");
         auto subReq = std::make_shared<SubRequest>(req);
         if (!subReq->needHandling())
         {
+            BMCWEB_LOG_ERROR("TEST: handleSubRoute NOT-NEEDED .. SKIP"); 
             return;
         }
+        BMCWEB_LOG_ERROR("TEST: handleSubRoute NEEDED --> GOTO handle()");
         oemRouter.handle(subReq, asyncResp);
+        BMCWEB_LOG_ERROR("TEST: handleSubRoute NEEDED --> DONE handle()");
     }
 
     OemRouter oemRouter;

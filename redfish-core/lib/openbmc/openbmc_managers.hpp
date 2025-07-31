@@ -6,6 +6,7 @@
 #include "dbus_singleton.hpp"
 #include "dbus_utility.hpp"
 #include "error_messages.hpp"
+#include "http_response.hpp"
 #include "io_context_singleton.hpp"
 #include "logging.hpp"
 #include "redfish.hpp"
@@ -1515,14 +1516,36 @@ inline void handlePatchManagerOpenBmc(
     std::optional<nlohmann::json::object_t> stepwiseControllers;
     std::optional<std::string> profile;
 
+    BMCWEB_LOG_ERROR("TEST: handlePatchManagerOpenBmc, BEGIN");
+
+#if 1
+    crow::Response nullRes;
     if (!json_util::readJsonObject(
-            payload, asyncResp->res, "OpenBmc/Fan/PidControllers",
+            payload, nullRes, "OpenBmc/Fan/PidControllers",
             pidControllers, "OpenBmc/Fan/FanControllers", fanControllers,
             "OpenBmc/Fan/FanZones", fanZones, "OpenBmc/Fan/StepwiseControllers",
             stepwiseControllers, "OpenBmc/Fan/Profile", profile))
     {
+        BMCWEB_LOG_ERROR(
+            "TEST: handlePatchManagerOpenBmc,  readJsonObject return false");
         return;
     }
+#else
+
+    if (!json_util::readJsonObject(
+            payload, asyncResp->res, "Fan/PidControllers", pidControllers,
+            "Fan/FanControllers", fanControllers, "Fan/FanZones", fanZones,
+            "Fan/StepwiseControllers", stepwiseControllers, "Fan/Profile",
+            profile))
+    {
+        BMCWEB_LOG_ERROR(
+            "TEST: handlePatchManagerOpenBmc,  readJsonObject return false");
+        return;
+    }
+#endif
+    BMCWEB_LOG_ERROR(
+        "TEST: handlePatchManagerOpenBmc, BMCWEB_REDFISH_OEM_MANAGER_FAN_DATA={}, fanControllers.has_value={}",
+        BMCWEB_REDFISH_OEM_MANAGER_FAN_DATA, fanControllers.has_value());
 
     if (pidControllers || fanControllers || fanZones || stepwiseControllers ||
         profile)

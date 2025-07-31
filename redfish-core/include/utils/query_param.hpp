@@ -854,6 +854,7 @@ class MultiAsyncResp : public std::enable_shared_from_this<MultiAsyncResp>
         const std::shared_ptr<std::vector<std::string>>& params,
         const crow::Response& resIn)
     {
+        BMCWEB_LOG_ERROR("TEST: startMultiFragmentHandle");
         asyncResp->res.jsonValue = resIn.jsonValue;
         auto multi = std::make_shared<MultiAsyncResp>(asyncResp);
         for (OemBaseRule* fragment : *fragments)

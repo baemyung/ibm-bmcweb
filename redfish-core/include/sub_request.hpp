@@ -3,7 +3,9 @@
 #pragma once
 
 #include "http_request.hpp"
+#include "http_response.hpp"
 #include "parsing.hpp"
+#include "utils/json_utils.hpp"
 
 #include <boost/beast/http/verb.hpp>
 #include <nlohmann/json.hpp>
@@ -20,15 +22,48 @@ class SubRequest
     explicit SubRequest(const crow::Request& req) :
         url_(req.url().encoded_path()), method_(req.method())
     {
-        // Extract OEM payload if present
+        BMCWEB_LOG_ERROR("TEST: SubRequest - CTOR. START.  method={}",
+                         req.methodString());
+        // Extract Oem/OpenBmc payload if present
         if (req.method() == boost::beast::http::verb::patch ||
             req.method() == boost::beast::http::verb::post)
         {
+            BMCWEB_LOG_ERROR("TEST: SubRequest - CTOR");
             nlohmann::json reqJson;
             if (parseRequestAsJson(req, reqJson) != JsonParseResult::Success)
             {
+                BMCWEB_LOG_ERROR("TEST: SubRequest - CTOR PARSE ERROR");
                 return;
             }
+
+            BMCWEB_LOG_ERROR("TEST: SubRequest - CTOR FINDING");
+
+#if 0
+
+            crow::Response nullRes;  // It is to ignore the unknown fields
+            std::optional<nlohmann::json::object_t> openBmcObj;
+            if (!redfish::json_util::readJson(reqJson, nullRes,
+                                              "Oem/OpenBmc", openBmcObj))
+            {
+                BMCWEB_LOG_ERROR("TEST: SubRequest - CTOR readJson ERROR - SKIP");
+                return;
+            }
+
+            if (openBmcObj.has_value() && !openBmcObj->empty())
+            {
+                payload_ = *openBmcObj;
+
+                nlohmann::json tPayload = payload_;
+                BMCWEB_LOG_ERROR("TEST: SubRequest - CTOR. FOUND. payload={}",
+                                 tPayload.dump());
+            }
+            else
+            {
+                BMCWEB_LOG_ERROR(
+                    "TEST: SubRequest - CTOR. NOT FOUND     **** OPENBMC SKIP");
+            }
+
+#else
 
             auto oemIt = reqJson.find("Oem");
             if (oemIt != reqJson.end())
@@ -38,8 +73,20 @@ class SubRequest
                 if (oemObj != nullptr && !oemObj->empty())
                 {
                     payload_ = *oemObj;
+
+                    nlohmann::json tPayload = payload_;
+                    BMCWEB_LOG_ERROR(
+                        "TEST: SubRequest222 - CTOR. FOUND. payload={}",
+                        tPayload.dump());
                 }
             }
+            else
+            {
+                BMCWEB_LOG_ERROR(
+                    "TEST: SubRequest - CTOR. NOT FOUND     **** OEM SKIP");
+            }
+
+#endif
         }
     }
 

@@ -993,6 +993,30 @@ inline void requestRoutesManager(App& app)
                     return;
                 }
 
+                BMCWEB_LOG_ERROR("TEST: patch Managers/bmc ENTERED");
+
+#if 0
+                std::optional<std::string> activeSoftwareImageOdataId;
+                std::optional<std::string> datetime;
+                std::optional<bool> locationIndicatorActive;
+                std::optional<bool> usbCodeUpdateEnabled;
+                std::optional<std::string> serviceIdentification;
+
+                if (!json_util::readJsonPatch(                            //
+                        req, asyncResp->res,                              //
+                        "DateTime", datetime,                             //
+                        "Links/ActiveSoftwareImage/@odata.id",
+                        activeSoftwareImageOdataId,                       //
+                        "LocationIndicatorActive",
+                        locationIndicatorActive,                          //
+                        "Oem/IBM/USBCodeUpdateEnabled",  usbCodeUpdateEnabled,                             //
+                        "ServiceIdentification", serviceIdentification    //
+                        ))
+                {
+                    BMCWEB_LOG_ERROR("TEST: patch Managers/bmc readJsonPatch ERROR-RETURN");
+                    return;
+                }
+#else
                 std::optional<std::string> activeSoftwareImageOdataId;
                 std::optional<std::string> datetime;
                 std::optional<bool> locationIndicatorActive;
@@ -1022,17 +1046,21 @@ inline void requestRoutesManager(App& app)
                         "ServiceIdentification", serviceIdentification    //
                         ))
                 {
+                    BMCWEB_LOG_ERROR("TEST: patch Managers/bmc readJsonPatch ERROR-RETURN");
                     return;
                 }
+#endif
 
                 if (usbCodeUpdateEnabled)
                 {
                     if constexpr (BMCWEB_IBM_USB_CODE_UPDATE)
                     {
+                         BMCWEB_LOG_ERROR("TEST: patch Managers/bmc BMCWEB_IBM_USB_CODE_UPDATE =DONE");
                         setUSBCodeUpdateState(asyncResp, *usbCodeUpdateEnabled);
                     }
                     else
                     {
+                         BMCWEB_LOG_ERROR("TEST: patch Managers/bmc BMCWEB_IBM_USB_CODE_UPDATE ==> NOT SUPPORTED");
                         messages::propertyUnknown(asyncResp->res, "Oem");
                         return;
                     }
@@ -1061,7 +1089,10 @@ inline void requestRoutesManager(App& app)
                         asyncResp, serviceIdentification.value());
                 }
 
+                 BMCWEB_LOG_ERROR("TEST: patch Managers/bmc readJsonPatch GOTO handleSubRoute");
+
                 RedfishService::getInstance(app).handleSubRoute(req, asyncResp);
+                 BMCWEB_LOG_ERROR("TEST: patch Managers/bmc readJsonPatch DONE handleSubRoute");
             });
 }
 

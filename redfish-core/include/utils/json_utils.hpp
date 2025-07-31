@@ -563,6 +563,7 @@ inline bool readJsonHelperObject(nlohmann::json::object_t& obj,
 
         if (unpackIndex == toUnpack.size())
         {
+            BMCWEB_LOG_ERROR("TEST: readJsonHelperObject   propertyUnknown item.first = {}", item.first);
             messages::propertyUnknown(res, item.first);
             result = false;
         }

@@ -223,12 +223,14 @@ class OemRouter
                 const std::shared_ptr<bmcweb::AsyncResp>& asyncResp) const
     {
         BMCWEB_LOG_DEBUG("Checking OEM routes");
+         BMCWEB_LOG_ERROR("TEST: Checking OEM routes");
         FindRouteResponse foundRoute = findRoute(*req);
         std::vector<OemBaseRule*> fragments =
             std::move(foundRoute.route.fragmentRules);
         std::vector<std::string> params = std::move(foundRoute.route.params);
         if (!fragments.empty())
         {
+            BMCWEB_LOG_ERROR("TEST: sub-handle fragments NOT EMPTY");
             std::function<void(crow::Response&)> handler =
                 asyncResp->res.releaseCompleteRequestHandler();
             auto multiResp = std::make_shared<bmcweb::AsyncResp>();
@@ -246,6 +248,7 @@ class OemRouter
         else
         {
             BMCWEB_LOG_DEBUG("No OEM routes found");
+            BMCWEB_LOG_ERROR("TEST: No OEM routes found");
         }
     }
 
