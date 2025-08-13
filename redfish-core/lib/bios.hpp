@@ -627,7 +627,7 @@ inline void handleBiosSettingsPatch(
                 {
                     const int64_t* attrValue =
                         attrItr.second.get_ptr<const int64_t*>();
-                    if (attrValue != nullptr)
+                    if (attrValue == nullptr)
                     {
                         BMCWEB_LOG_WARNING("The value must be of type int");
                         std::string val =
@@ -676,7 +676,7 @@ inline void handleBiosSettingsPatch(
                 {
                     const std::string* attrValue =
                         attrItr.second.get_ptr<const std::string*>();
-                    if (attrValue != nullptr)
+                    if (attrValue == nullptr)
                     {
                         BMCWEB_LOG_ERROR("The value must be of type String");
                         std::string val =
@@ -725,7 +725,7 @@ inline void handleBiosSettingsPatch(
                 {
                     const std::string* attrValue =
                         attrItr.second.get_ptr<const std::string*>();
-                    if (attrValue != nullptr)
+                    if (attrValue == nullptr)
                     {
                         BMCWEB_LOG_WARNING("The value must be of type string");
                         std::string val =
@@ -741,7 +741,7 @@ inline void handleBiosSettingsPatch(
                 {
                     const bool* attrValue =
                         attrItr.second.get_ptr<const bool*>();
-                    if (attrValue != nullptr)
+                    if (attrValue == nullptr)
                     {
                         BMCWEB_LOG_WARNING("The value must be of type bool");
                         std::string val =
