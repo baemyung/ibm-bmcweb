@@ -5,6 +5,7 @@
 #include "bmcweb_config.h"
 
 #include "async_resp.hpp"
+#include "dbus_utility.hpp"
 #include "error_messages.hpp"
 #include "logging.hpp"
 #include "persistent_data.hpp"
@@ -16,6 +17,7 @@
 #include <functional>
 #include <memory>
 #include <string_view>
+#include <utility>
 
 namespace redfish
 {
@@ -122,7 +124,7 @@ inline void getValidManagerPath(
 {
     dbus::utility::getSubTree(
         "/xyz/openbmc_project/inventory", 0, bmcInterfaces,
-        [asyncResp, managerId, callback{std::move(callback)}](
+        [asyncResp, managerId, callback = std::move(callback)](
             const boost::system::error_code& ec,
             const dbus::utility::MapperGetSubTreeResponse& subtree) {
             afterGetValidManagerPath(asyncResp, managerId, callback, ec,
