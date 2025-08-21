@@ -931,6 +931,29 @@ inline void handleManagerPatch(
     RedfishService::getInstance(app).handleSubRoute(req, asyncResp);
 }
 
+inline void filloutManagerCollectionGet(
+    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
+    const std::vector<std::string>& bmcList)
+{
+    // Collections don't include the static data added by SubRoute
+    // because it has a duplicate entry for members
+    asyncResp->res.jsonValue["@odata.id"] = "/redfish/v1/Managers";
+    asyncResp->res.jsonValue["@odata.type"] =
+        "#ManagerCollection.ManagerCollection";
+    asyncResp->res.jsonValue["Name"] = "Manager Collection";
+
+    nlohmann::json::array_t members;
+    for (const std::string& bmcId : bmcList)
+    {
+        nlohmann::json::object_t bmc;
+        bmc["@odata.id"] =
+            boost::urls::format("/redfish/v1/Managers/{}", bmcId);
+        members.push_back(std::move(bmc));
+    }
+    asyncResp->res.jsonValue["Members"] = std::move(members);
+    asyncResp->res.jsonValue["Members@odata.count"] = bmcList.size();
+}
+
 inline void handleManagerCollectionGet(
     crow::App& app, const crow::Request& req,
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
@@ -939,18 +962,43 @@ inline void handleManagerCollectionGet(
     {
         return;
     }
-    // Collections don't include the static data added by SubRoute
-    // because it has a duplicate entry for members
-    asyncResp->res.jsonValue["@odata.id"] = "/redfish/v1/Managers";
-    asyncResp->res.jsonValue["@odata.type"] =
-        "#ManagerCollection.ManagerCollection";
-    asyncResp->res.jsonValue["Name"] = "Manager Collection";
-    asyncResp->res.jsonValue["Members@odata.count"] = 1;
-    nlohmann::json::array_t members;
-    nlohmann::json& bmc = members.emplace_back();
-    bmc["@odata.id"] = boost::urls::format("/redfish/v1/Managers/{}",
-                                           BMCWEB_REDFISH_MANAGER_URI_NAME);
-    asyncResp->res.jsonValue["Members"] = std::move(members);
+
+    if constexpr (BMCWEB_EXPERIMENTAL_REDFISH_MULTI_MANAGER)
+    {
+        // GetSubTree on all interfaces which provide info about a Manager
+        constexpr std::array<std::string_view, 1> interfaces = {
+            "xyz.openbmc_project.Inventory.Item.Bmc"};
+
+        dbus::utility::getSubTreePaths(
+            "/xyz/openbmc_project/inventory", 0, interfaces,
+            [asyncResp](const boost::system::error_code& ec,
+                        const dbus::utility::MapperGetSubTreePathsResponse&
+                            subtreePaths) {
+                if (ec)
+                {
+                    BMCWEB_LOG_ERROR("DBUS response error {}", ec);
+                    messages::internalError(asyncResp->res);
+                    return;
+                }
+                std::vector<std::string> bmcList;
+                for (const std::string& path : subtreePaths)
+                {
+                    std::string bmcId =
+                        sdbusplus::message::object_path(path).filename();
+                    if (!bmcId.empty())
+                    {
+                        bmcList.emplace_back(bmcId);
+                    }
+                }
+                filloutManagerCollectionGet(asyncResp, bmcList);
+            });
+    }
+    else
+    {
+        std::vector<std::string> bmcList;
+        bmcList.emplace_back(BMCWEB_REDFISH_MANAGER_URI_NAME);
+        filloutManagerCollectionGet(asyncResp, bmcList);
+    }
 }
 
 inline void requestRoutesManager(App& app)
