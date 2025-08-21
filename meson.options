@@ -489,7 +489,7 @@ option(
 option(
     'experimental-redfish-multi-manager',
     type: 'feature',
-    value: 'disabled',
+    value: 'enabled',
     description: '''This is a temporary option flag for staging the
                     support of multi Manager. Do not enable in a production
                     environment, or where API stability is required. Goal is to
