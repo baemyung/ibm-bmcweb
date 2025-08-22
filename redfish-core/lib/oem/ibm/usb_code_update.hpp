@@ -7,6 +7,8 @@
 #include "logging.hpp"
 #include "utils/dbus_utils.hpp"
 
+#include <boost/url/format.hpp>
+#include <boost/url/url.hpp>
 #include <sdbusplus/message/native_types.hpp>
 
 #include <array>
@@ -32,13 +34,14 @@ constexpr std::array<std::string_view, 1> usbCodeUpdateInterfaces = {
  * @return None.
  */
 inline void getUSBCodeUpdateState(
-    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
+    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
+    const std::string& managerId)
 {
     BMCWEB_LOG_DEBUG("Get USB code update state");
     dbus::utility::getDbusObject(
         usbCodeUpdateObjectPath, usbCodeUpdateInterfaces,
-        [asyncResp](const boost::system::error_code& ec1,
-                    const dbus::utility::MapperGetObject& object) {
+        [asyncResp, managerId](const boost::system::error_code& ec1,
+                               const dbus::utility::MapperGetObject& object) {
             if ((ec1 == boost::system::errc::io_error) || object.empty())
             {
                 BMCWEB_LOG_DEBUG("USB code update not found");
@@ -54,8 +57,8 @@ inline void getUSBCodeUpdateState(
             dbus::utility::getProperty<bool>(
                 *crow::connections::systemBus, object.begin()->first,
                 usbCodeUpdateObjectPath, usbCodeUpdateInterface, "Enabled",
-                [asyncResp](const boost::system::error_code& ec2,
-                            bool usbCodeUpdateState) {
+                [asyncResp, managerId](const boost::system::error_code& ec2,
+                                       bool usbCodeUpdateState) {
                     if (ec2)
                     {
                         BMCWEB_LOG_ERROR("DBUS response error: {}", ec2);
@@ -66,7 +69,8 @@ inline void getUSBCodeUpdateState(
                     asyncResp->res.jsonValue["Oem"]["IBM"]["@odata.type"] =
                         "#IBMManager.v1_0_0.IBM";
                     asyncResp->res.jsonValue["Oem"]["IBM"]["@odata.id"] =
-                        "/redfish/v1/Managers/bmc#/Oem/IBM";
+                        boost::urls::format("/redfish/v1/Managers/{}#/Oem/IBM",
+                                            managerId);
                     asyncResp->res
                         .jsonValue["Oem"]["IBM"]["USBCodeUpdateEnabled"] =
                         usbCodeUpdateState;
