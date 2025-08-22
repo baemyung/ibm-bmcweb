@@ -98,21 +98,40 @@ inline void afterGetValidManagerPath(
         return;
     }
 
-    if (managerId != BMCWEB_REDFISH_MANAGER_URI_NAME)
+    if constexpr (BMCWEB_EXPERIMENTAL_REDFISH_MULTI_MANAGER)
     {
+        for (const auto& [managerPath, serviceMap] : subtree)
+        {
+            std::string mgrId =
+                sdbusplus::message::object_path(managerPath).filename();
+            if (mgrId == managerId)
+            {
+                callback(managerPath, serviceMap);
+                return;
+            }
+        }
+        BMCWEB_LOG_WARNING("Manager {} not found", managerId);
         messages::resourceNotFound(asyncResp->res, "Manager", managerId);
-        return;
     }
-    // Assume only 1 bmc D-Bus object
-    // Throw an error if there is more than 1
-    if (subtree.size() > 1)
+    else
     {
-        BMCWEB_LOG_ERROR("Found more than 1 bmc D-Bus object!");
-        messages::internalError(asyncResp->res);
-        return;
-    }
+        if (managerId != BMCWEB_REDFISH_MANAGER_URI_NAME)
+        {
+            BMCWEB_LOG_WARNING("Manager {} not found", managerId);
+            messages::resourceNotFound(asyncResp->res, "Manager", managerId);
+            return;
+        }
+        // Assume only 1 bmc D-Bus object
+        // Throw an error if there is more than 1
+        if (subtree.size() > 1)
+        {
+            BMCWEB_LOG_ERROR("Found more than 1 bmc D-Bus object!");
+            messages::internalError(asyncResp->res);
+            return;
+        }
 
-    callback(subtree[0].first, subtree[0].second);
+        callback(subtree[0].first, subtree[0].second);
+    }
 }
 
 inline void getValidManagerPath(

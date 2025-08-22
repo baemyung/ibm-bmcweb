@@ -42,7 +42,6 @@
 #include <sdbusplus/message/native_types.hpp>
 #include <sdbusplus/unpack_properties.hpp>
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -772,7 +771,7 @@ inline void getManagerData(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
 
     if constexpr (BMCWEB_IBM_USB_CODE_UPDATE)
     {
-        getUSBCodeUpdateState(asyncResp);
+        getUSBCodeUpdateState(asyncResp, managerId);
     }
 
     // ManagerDiagnosticData is added for all BMCs.
@@ -830,12 +829,6 @@ inline void handleManagerGet(
 {
     if (!redfish::setUpRedfishRoute(app, req, asyncResp))
     {
-        return;
-    }
-
-    if (managerId != BMCWEB_REDFISH_MANAGER_URI_NAME)
-    {
-        messages::resourceNotFound(asyncResp->res, "Manager", managerId);
         return;
     }
 
@@ -967,11 +960,9 @@ inline void handleManagerCollectionGet(
     if constexpr (BMCWEB_EXPERIMENTAL_REDFISH_MULTI_MANAGER)
     {
         // GetSubTree on all interfaces which provide info about a Manager
-        constexpr std::array<std::string_view, 1> interfaces = {
-            "xyz.openbmc_project.Inventory.Item.Bmc"};
 
         dbus::utility::getSubTreePaths(
-            "/xyz/openbmc_project/inventory", 0, interfaces,
+            "/xyz/openbmc_project/inventory", 0, bmcInterfaces,
             [asyncResp](const boost::system::error_code& ec,
                         const dbus::utility::MapperGetSubTreePathsResponse&
                             subtreePaths) {
