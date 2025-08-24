@@ -669,10 +669,11 @@ inline void getPhysicalAssets(
     }
 }
 
-inline void getManagerData(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-                           const std::string& managerId,
-                           const std::string& managerPath,
-                           const dbus::utility::MapperServiceMap& serviceMap)
+inline void getManagerData(
+    RedfishService& rfService, const std::shared_ptr<crow::Request>& req,
+    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
+    const std::string& managerId, const std::string& managerPath,
+    const dbus::utility::MapperServiceMap& serviceMap)
 {
     if (managerPath.empty() || serviceMap.size() != 1)
     {
@@ -819,6 +820,8 @@ inline void getManagerData(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
             }
         }
     }
+
+    rfService.handleSubRoute(*req, asyncResp);
 }
 
 inline void handleManagerGet(
@@ -837,9 +840,14 @@ inline void handleManagerGet(
         return;
     }
 
+    RedfishService& rfService = RedfishService::getInstance(app);
+    std::shared_ptr<crow::Request> newReq =
+        std::make_shared<crow::Request>(req.copy());
+
     manager_utils::getValidManagerPath(
         asyncResp, managerId,
-        std::bind_front(getManagerData, asyncResp, managerId));
+        std::bind_front(getManagerData, std::ref(rfService), newReq, asyncResp,
+                        managerId));
 
     RedfishService::getInstance(app).handleSubRoute(req, asyncResp);
 }
