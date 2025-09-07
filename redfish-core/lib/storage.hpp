@@ -18,9 +18,9 @@
 #include "query.hpp"
 #include "redfish_util.hpp"
 #include "registries/privilege_registry.hpp"
+#include "utils/asset_utils.hpp"
 #include "utils/chassis_utils.hpp"
 #include "utils/collection.hpp"
-#include "utils/dbus_utils.hpp"
 #include "utils/name_utils.hpp"
 
 #include <boost/beast/http/verb.hpp>
@@ -28,7 +28,6 @@
 #include <boost/url/format.hpp>
 #include <nlohmann/json.hpp>
 #include <sdbusplus/message/native_types.hpp>
-#include <sdbusplus/unpack_properties.hpp>
 
 #include <algorithm>
 #include <array>
@@ -291,60 +290,6 @@ inline void requestRoutesStorage(App& app)
         .privileges(redfish::privileges::getStorage)
         .methods(boost::beast::http::verb::get)(
             std::bind_front(handleStorageGet, std::ref(app)));
-}
-
-inline void getDriveAsset(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-                          const std::string& connectionName,
-                          const std::string& path)
-{
-    dbus::utility::getAllProperties(
-        connectionName, path, "xyz.openbmc_project.Inventory.Decorator.Asset",
-        [asyncResp](const boost::system::error_code& ec,
-                    const std::vector<
-                        std::pair<std::string, dbus::utility::DbusVariantType>>&
-                        propertiesList) {
-            if (ec)
-            {
-                // this interface isn't necessary
-                return;
-            }
-
-            const std::string* partNumber = nullptr;
-            const std::string* serialNumber = nullptr;
-            const std::string* manufacturer = nullptr;
-            const std::string* model = nullptr;
-
-            const bool success = sdbusplus::unpackPropertiesNoThrow(
-                dbus_utils::UnpackErrorPrinter(), propertiesList, "PartNumber",
-                partNumber, "SerialNumber", serialNumber, "Manufacturer",
-                manufacturer, "Model", model);
-
-            if (!success)
-            {
-                messages::internalError(asyncResp->res);
-                return;
-            }
-
-            if (partNumber != nullptr)
-            {
-                asyncResp->res.jsonValue["PartNumber"] = *partNumber;
-            }
-
-            if (serialNumber != nullptr)
-            {
-                asyncResp->res.jsonValue["SerialNumber"] = *serialNumber;
-            }
-
-            if (manufacturer != nullptr)
-            {
-                asyncResp->res.jsonValue["Manufacturer"] = *manufacturer;
-            }
-
-            if (model != nullptr)
-            {
-                asyncResp->res.jsonValue["Model"] = *model;
-            }
-        });
 }
 
 inline void getDrivePresent(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
@@ -616,7 +561,8 @@ inline void addAllDriveInfo(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     {
         if (interface == "xyz.openbmc_project.Inventory.Decorator.Asset")
         {
-            getDriveAsset(asyncResp, connectionName, path);
+            asset_utils::getAssetInfo(asyncResp, connectionName, path,
+                                      ""_json_pointer, false);
         }
         else if (interface == "xyz.openbmc_project.Inventory.Item")
         {
@@ -974,53 +920,6 @@ inline void requestRoutesChassisDriveName(App& app)
             std::bind_front(handleChassisDriveGet, std::ref(app)));
 }
 
-inline void getStorageControllerAsset(
-    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-    const boost::system::error_code& ec,
-    const std::vector<std::pair<std::string, dbus::utility::DbusVariantType>>&
-        propertiesList)
-{
-    if (ec)
-    {
-        // this interface isn't necessary
-        BMCWEB_LOG_DEBUG("Failed to get StorageControllerAsset");
-        return;
-    }
-
-    const std::string* partNumber = nullptr;
-    const std::string* serialNumber = nullptr;
-    const std::string* manufacturer = nullptr;
-    const std::string* model = nullptr;
-    if (!sdbusplus::unpackPropertiesNoThrow(
-            dbus_utils::UnpackErrorPrinter(), propertiesList, "PartNumber",
-            partNumber, "SerialNumber", serialNumber, "Manufacturer",
-            manufacturer, "Model", model))
-    {
-        messages::internalError(asyncResp->res);
-        return;
-    }
-
-    if (partNumber != nullptr)
-    {
-        asyncResp->res.jsonValue["PartNumber"] = *partNumber;
-    }
-
-    if (serialNumber != nullptr)
-    {
-        asyncResp->res.jsonValue["SerialNumber"] = *serialNumber;
-    }
-
-    if (manufacturer != nullptr)
-    {
-        asyncResp->res.jsonValue["Manufacturer"] = *manufacturer;
-    }
-
-    if (model != nullptr)
-    {
-        asyncResp->res.jsonValue["Model"] = *model;
-    }
-}
-
 inline void populateStorageController(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     const std::string& controllerId, const std::string& connectionName,
@@ -1052,14 +951,8 @@ inline void populateStorageController(
             }
         });
 
-    dbus::utility::getAllProperties(
-        connectionName, path, "xyz.openbmc_project.Inventory.Decorator.Asset",
-        [asyncResp](const boost::system::error_code& ec,
-                    const std::vector<
-                        std::pair<std::string, dbus::utility::DbusVariantType>>&
-                        propertiesList) {
-            getStorageControllerAsset(asyncResp, ec, propertiesList);
-        });
+    asset_utils::getAssetInfo(asyncResp, connectionName, path, ""_json_pointer,
+                              false);
 }
 
 inline void getStorageControllerHandler(
