@@ -91,44 +91,32 @@ void getValidChassisPath(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     BMCWEB_LOG_DEBUG("checkChassisId exit");
 }
 
-inline void doGetAssociatedChassisAssembly(
+inline void afterGetChassisAssembly(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-    const std::string& chassisPath,
-    std::function<void(const std::vector<std::string>& assemblyList)>&&
-        callback)
+    std::function<void(const boost::system::error_code&,
+                       const std::vector<std::string>& sortedAssemblyList)>&
+        callback,
+    const boost::system::error_code& ec,
+    const dbus::utility::MapperGetSubTreePathsResponse& subtreePaths)
 {
-    BMCWEB_LOG_DEBUG("Get associated chassis assembly");
+    if (ec)
+    {
+        if (ec.value() == boost::system::errc::io_error || ec.value() == EBADR)
+        {
+            // Not found
+            callback(ec, std::vector<std::string>());
+            return;
+        }
 
-    sdbusplus::message::object_path endpointPath{chassisPath};
-    endpointPath /= "assembly";
+        BMCWEB_LOG_ERROR("DBUS response error {}", ec);
+        messages::internalError(asyncResp->res);
+        return;
+    }
 
-    dbus::utility::getAssociatedSubTreePaths(
-        endpointPath,
-        sdbusplus::message::object_path("/xyz/openbmc_project/inventory"), 0,
-        chassisAssemblyInterfaces,
-        [asyncResp, chassisPath, callback = std::move(callback)](
-            const boost::system::error_code& ec,
-            const dbus::utility::MapperGetSubTreePathsResponse& subtreePaths) {
-            if (ec)
-            {
-                if (ec.value() != EBADR)
-                {
-                    BMCWEB_LOG_ERROR(
-                        "DBUS response error for getAssociatedSubTreePaths {}",
-                        ec.value());
-                    messages::internalError(asyncResp->res);
-                    return;
-                }
-                // Pass the empty assemblyList to caller
-                callback(std::vector<std::string>());
-                return;
-            }
+    std::vector<std::string> sortedAssemblyList = subtreePaths;
+    std::ranges::sort(sortedAssemblyList, AlphanumLess<std::string>());
 
-            std::vector<std::string> sortedAssemblyList = subtreePaths;
-            std::ranges::sort(sortedAssemblyList);
-
-            callback(sortedAssemblyList);
-        });
+    callback(ec, sortedAssemblyList);
 }
 
 /**
@@ -142,28 +130,18 @@ inline void doGetAssociatedChassisAssembly(
  */
 inline void getChassisAssembly(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-    const std::string& chassisID,
+    const std::string& chassisId,
     std::function<void(const std::optional<std::string>& validChassisPath,
                        const std::vector<std::string>& sortedAssemblyList)>&&
         callback)
 {
     BMCWEB_LOG_DEBUG("Get ChassisAssembly");
 
-    // get the chassis path
-    redfish::chassis_utils::getValidChassisPath(
-        asyncResp, chassisID,
-        [asyncResp, callback = std::move(callback)](
-            const std::optional<std::string>& validChassisPath) {
-            if (!validChassisPath)
-            {
-                // tell the caller as not valid chassisPath
-                callback(validChassisPath, std::vector<std::string>());
-                return;
-            }
-            doGetAssociatedChassisAssembly(
-                asyncResp, *validChassisPath,
-                std::bind_front(callback, validChassisPath));
-        });
+    dbus::utility::getAssociatedSubTreePathsById(
+        chassisId, "/xyz/openbmc_project/inventory", chassisInterfaces,
+        "containing", chassisAssemblyInterfaces,
+        std::bind_front(afterGetChassisAssembly, asyncResp,
+                        std::move(callback)));
 }
 
 } // namespace chassis_utils
