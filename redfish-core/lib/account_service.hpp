@@ -1359,7 +1359,6 @@ inline void afterVerifyUserExists(
             persistent_data::SessionStore::getInstance()
                 .removeSessionsByUsernameExceptSession(params.username,
                                                        params.session);
-            messages::success(asyncResp->res);
         }
     }
 
