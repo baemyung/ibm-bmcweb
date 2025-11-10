@@ -15,6 +15,7 @@
 #include "logging.hpp"
 #include "query.hpp"
 #include "registries/privilege_registry.hpp"
+#include "utils/assembly_utils.hpp"
 #include "utils/chassis_utils.hpp"
 #include "utils/dbus_utils.hpp"
 #include "utils/json_utils.hpp"
@@ -105,12 +106,12 @@ inline void addLinkedFabricAdapter(
 inline void doLinkAssociatedDiskBackplaneToChassis(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     const std::string& chassisId, const std::string& drivePath, size_t index,
-    const std::optional<std::string>& validChassisPath,
+    const boost::system::error_code& ec,
     const std::vector<std::string>& assemblyList)
 {
-    if (!validChassisPath || assemblyList.empty())
+    if (ec || assemblyList.empty())
     {
-        BMCWEB_LOG_WARNING("Chassis not found");
+        BMCWEB_LOG_WARNING("Chassis {} not found", chassisId);
         messages::resourceNotFound(asyncResp->res, "Chassis", chassisId);
         return;
     }
@@ -165,7 +166,7 @@ inline void afterLinkAssociatedDiskBackplane(
     // or the only one we will have instead of looping through.
     const std::string& drivePath = endpoints[0];
     std::string chassisId{"chassis"};
-    redfish::chassis_utils::getChassisAssembly(
+    assembly_utils::getChassisAssembly(
         asyncResp, chassisId,
         std::bind_front(doLinkAssociatedDiskBackplaneToChassis, asyncResp,
                         chassisId, drivePath, index));

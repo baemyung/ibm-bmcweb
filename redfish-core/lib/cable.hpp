@@ -14,6 +14,7 @@
 #include "logging.hpp"
 #include "query.hpp"
 #include "registries/privilege_registry.hpp"
+#include "utils/assembly_utils.hpp"
 #include "utils/chassis_utils.hpp"
 #include "utils/collection.hpp"
 #include "utils/dbus_utils.hpp"
@@ -33,7 +34,6 @@
 #include <cmath>
 #include <functional>
 #include <memory>
-#include <optional>
 #include <ranges>
 #include <string>
 #include <string_view>
@@ -306,14 +306,15 @@ inline void getCableDownstreamResources(
     const std::string& cableObjectPath)
 {
     // retrieve Downstream Resources
-    chassis_utils::getChassisAssembly(
-        asyncResp, "chassis",
-        [asyncResp,
-         cableObjectPath](const std::optional<std::string>& validChassisPath,
+    const std::string chassisID = "chassis";
+    assembly_utils::getChassisAssembly(
+        asyncResp, chassisID,
+        [asyncResp, chassisID,
+         cableObjectPath](const boost::system::error_code& ec,
                           const std::vector<std::string>& updatedAssemblyList) {
-            if (!validChassisPath || updatedAssemblyList.empty())
+            if (ec || updatedAssemblyList.empty())
             {
-                BMCWEB_LOG_DEBUG("Chassis not found");
+                BMCWEB_LOG_DEBUG("Chassis {} not found", chassisID);
                 return;
             }
             doGetCableDownstreamResources(asyncResp, cableObjectPath,
