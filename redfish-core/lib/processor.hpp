@@ -1107,7 +1107,8 @@ inline void getEnabledStatus(
 inline void getSubProcessorsCoreData(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     const std::string& processorId, const std::string& coreId,
-    const std::string& corePath, const dbus::utility::MapperServiceMap& object)
+    const std::string& corePath,
+    const dbus::utility::MapperServiceMap& serviceMap)
 {
     asyncResp->res.addHeader(
         boost::beast::http::field::link,
@@ -1122,30 +1123,85 @@ inline void getSubProcessorsCoreData(
     asyncResp->res.jsonValue["Status"]["State"] = resource::State::Enabled;
     asyncResp->res.jsonValue["Status"]["Health"] = resource::Health::OK;
 
-    for (const auto& [service, interfaces] : object)
-    {
-        bool foundAvailability = false;
+    std::optional<bool> present;
+    std::optional<bool> functional;
+    std::optional<bool> available;
 
-        for (const auto& intf : interfaces)
+    for (const auto& [serviceName, interfaceList] : serviceMap)
+    {
+        for (const auto& [interface, properties] : interfaceList)
         {
-            if (intf == "xyz.openbmc_project.Inventory.Item")
+            if (interface ==
+                "xyz.openbmc_project.State.Decorator.OperationalStatus")
+            {
+                bool success = sdbusplus::unpackPropertiesNoThrow(
+                    dbus_utils::UnpackErrorPrinter(), properties, "Functional",
+                    functional);
+                if (!success)
+                {
+                    messages::internalError(asyncResp->res);
+                    return;
+                }
+            }
+
+            else if (interface == "xyz.openbmc_project.Inventory.Item")
             {
                 name_util::getPrettyName(asyncResp, corePath, service,
                                          "/Name"_json_pointer);
+                bool success = sdbusplus::unpackPropertiesNoThrow(
+                    dbus_utils::UnpackErrorPrinter(), properties, "Present",
+                    present);
+                if (!success)
+                {
+                    messages::internalError(asyncResp->res);
+                    return;
+                }
             }
-            else if (intf == "xyz.openbmc_project.Object.Enable")
+            else if (interface == "xyz.openbmc_project.Object.Enable")
             {
-                getEnabledStatus(asyncResp, service, corePath, intf);
+                const bool* enabled = nullptr;
+                bool success = sdbusplus::unpackPropertiesNoThrow(
+                    dbus_utils::UnpackErrorPrinter(), properties, "Enabled",
+                    enabled);
+                if (!success)
+                {
+                    messages::internalError(asyncResp->res);
+                    return;
+                }
+                if (enabled != nullptr)
+                {
+                    asyncResp->res.jsonValue["Enabled"] = *enabled;
+                }
             }
-            else if (intf == "xyz.openbmc_project.State.Decorator.Availability")
+            else if (interface ==
+                     "xyz.openbmc_project.State.Decorator.Availability")
             {
-                foundAvailability = true;
+                bool success = sdbusplus::unpackPropertiesNoThrow(
+                    dbus_utils::UnpackErrorPrinter(), properties, "Available",
+                    available);
+                if (!success)
+                {
+                    messages::internalError(asyncResp->res);
+                    return;
+                }
             }
         }
 
-        if (foundAvailability)
+        if (!available.value_or(true))
         {
-            getSubProcessorsCoreStateAndHealth(asyncResp, service, corePath);
+            asyncResp->res.jsonValue["Status"]["State"] =
+                resource::State::UnavailableOffline;
+        }
+        else if (!present.value_or(true))
+        {
+            asyncResp->res.jsonValue["Status"]["State"] =
+                resource::State::Absent;
+        }
+
+        if (!functional.value_or(true))
+        {
+            asyncResp->res.jsonValue["Status"]["Health"] =
+                resource::Health::Critical;
         }
 
         if constexpr (BMCWEB_HW_ISOLATION)
@@ -1179,11 +1235,11 @@ inline void handleSubProcessorsSubtree(
         messages::internalError(asyncResp->res);
         return;
     }
-    for (const auto& [corePath, object] : subtree)
+    for (const auto& [corePath, serviceMap] : subtree)
     {
         if (sdbusplus::message::object_path(corePath).filename() == coreId)
         {
-            callback(corePath, object);
+            callback(corePath, serviceMap);
             return;
         }
     }
