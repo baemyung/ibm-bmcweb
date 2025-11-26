@@ -1002,13 +1002,12 @@ inline void getProcessorPaths(
 
 inline void getSubProcessorsCoreHealth(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-    const std::string& service, const std::string& objPath, bool available)
+    const std::string& service, const std::string& objPath)
 {
     dbus::utility::getProperty<bool>(
         service, objPath,
         "xyz.openbmc_project.State.Decorator.OperationalStatus", "Functional",
-        [asyncResp,
-         available](const boost::system::error_code& ec, bool functional) {
+        [asyncResp](const boost::system::error_code& ec, bool functional) {
             if (ec)
             {
                 if (ec.value() != EBADR)
@@ -1019,7 +1018,7 @@ inline void getSubProcessorsCoreHealth(
                 return;
             }
 
-            if (!functional || !available)
+            if (!functional)
             {
                 asyncResp->res.jsonValue["Status"]["Health"] =
                     resource::Health::Critical;
@@ -1027,59 +1026,63 @@ inline void getSubProcessorsCoreHealth(
         });
 }
 
-inline void getSubProcessorsCoreState(
+inline void afterGetSubProcessorsCorePresent(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-    const std::string& service, const std::string& objPath, bool available)
+    const boost::system::error_code& ec, bool present)
 {
-    dbus::utility::getProperty<bool>(
-        service, objPath, "xyz.openbmc_project.Inventory.Item", "Present",
-        [asyncResp,
-         available](const boost::system::error_code& ec, bool present) {
-            if (ec)
-            {
-                if (ec.value() != EBADR)
-                {
-                    BMCWEB_LOG_ERROR("DBUS response error, ec: {}", ec.value());
-                    messages::internalError(asyncResp->res);
-                }
-                return;
-            }
+    if (ec)
+    {
+        if (ec.value() != EBADR)
+        {
+            BMCWEB_LOG_ERROR("DBUS response error for Available {}",
+                             ec.value());
+            messages::internalError(asyncResp->res);
+        }
+        return;
+    }
 
-            if (!present)
-            {
-                asyncResp->res.jsonValue["Status"]["State"] =
-                    resource::State::Absent;
-            }
-            else if (!available)
-            {
-                asyncResp->res.jsonValue["Status"]["State"] =
-                    resource::State::UnavailableOffline;
-            }
-        });
+    if (!present)
+    {
+        asyncResp->res.jsonValue["Status"]["State"] = resource::State::Absent;
+        return;
+    }
 }
 
-inline void getSubProcessorsCoreStateAndHealth(
+inline void afterGetSubProcessorsCoreAvailable(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-    const std::string& service, const std::string& objPath)
+    const std::string& service, const std::string& corePath,
+    const boost::system::error_code& ec, bool available)
+{
+    if (ec)
+    {
+        if (ec.value() != EBADR)
+        {
+            BMCWEB_LOG_ERROR("DBUS response error, ec: {}", ec.value());
+            messages::internalError(asyncResp->res);
+        }
+        return;
+    }
+
+    if (!available)
+    {
+        asyncResp->res.jsonValue["Status"]["State"] =
+            resource::State::UnavailableOffline;
+    }
+
+    dbus::utility::getProperty<bool>(
+        service, corePath, "xyz.openbmc_project.Inventory.Item", "Present",
+        std::bind_front(afterGetSubProcessorsCorePresent, asyncResp));
+}
+
+inline void getSubProcessorsCoreState(
+    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
+    const std::string& service, const std::string& corePath)
 {
     dbus::utility::getProperty<bool>(
-        service, objPath, "xyz.openbmc_project.State.Decorator.Availability",
+        service, corePath, "xyz.openbmc_project.State.Decorator.Availability",
         "Available",
-        [asyncResp, service,
-         objPath](const boost::system::error_code& ec, bool available) {
-            if (ec)
-            {
-                if (ec.value() != EBADR)
-                {
-                    BMCWEB_LOG_ERROR("DBUS response error for Available {}",
-                                     ec.value());
-                    messages::internalError(asyncResp->res);
-                }
-                return;
-            }
-            getSubProcessorsCoreHealth(asyncResp, service, objPath, available);
-            getSubProcessorsCoreState(asyncResp, service, objPath, available);
-        });
+        std::bind_front(afterGetSubProcessorsCoreAvailable, asyncResp, service,
+                        corePath));
 }
 
 inline void getEnabledStatus(
@@ -1124,8 +1127,6 @@ inline void getSubProcessorsCoreData(
 
     for (const auto& [service, interfaces] : object)
     {
-        bool foundAvailability = false;
-
         for (const auto& intf : interfaces)
         {
             if (intf == "xyz.openbmc_project.Inventory.Item")
@@ -1137,16 +1138,10 @@ inline void getSubProcessorsCoreData(
             {
                 getEnabledStatus(asyncResp, service, corePath, intf);
             }
-            else if (intf == "xyz.openbmc_project.State.Decorator.Availability")
-            {
-                foundAvailability = true;
-            }
         }
 
-        if (foundAvailability)
-        {
-            getSubProcessorsCoreStateAndHealth(asyncResp, service, corePath);
-        }
+        getSubProcessorsCoreState(asyncResp, service, corePath);
+        getSubProcessorsCoreHealth(asyncResp, service, corePath);
 
         if constexpr (BMCWEB_HW_ISOLATION)
         {
