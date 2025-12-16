@@ -33,8 +33,7 @@ inline void createSecretKeyUtil(
 {
     dbus::utility::getProperty<bool>(
         "xyz.openbmc_project.User.Manager", userPath,
-        "xyz.openbmc_project.User.TOTPAuthenticator",
-        "SecretKeyIsValid",
+        "xyz.openbmc_project.User.TOTPAuthenticator", "SecretKeyIsValid",
         [asyncResp, username, userPath](const boost::system::error_code& ec,
                                         const bool isSecretKeySet) {
             if (ec)
@@ -54,19 +53,21 @@ inline void createSecretKeyUtil(
 
             // If secret key is not set, then proceed to create it
             dbus::utility::async_method_call(
-                [asyncResp, username](const boost::system::error_code& ec,
+                [asyncResp, username](const boost::system::error_code& ec1,
                                       const std::string& secretKey) {
-                    if (ec)
+                    if (ec1)
                     {
-                        BMCWEB_LOG_ERROR("D-Bus response error: {}", ec.value());
+                        BMCWEB_LOG_ERROR("D-Bus response error: {}",
+                                         ec1.value());
                         messages::internalError(asyncResp->res);
                         return;
                     }
                     asyncResp->res.jsonValue["SecretKey"] = secretKey;
                 },
                 "xyz.openbmc_project.User.Manager", userPath,
-                "xyz.openbmc_project.User.TOTPAuthenticator", "CreateSecretKey");
-            });
+                "xyz.openbmc_project.User.TOTPAuthenticator",
+                "CreateSecretKey");
+        });
 }
 
 inline void handleGenerateSecretKey(
@@ -346,7 +347,7 @@ inline void requestAccountServiceMFARoutes(App& app)
         // TODO this privilege should be using the generated endpoints, but
         // because of the special handling of ConfigureSelf, it's not able to
         // yet
-        .privileges({{"ConfigureUsers"}, {"ConfigureSelf"}})
+        .privileges({{"ConfigureUsers"}})
         .methods(boost::beast::http::verb::post)(
             std::bind_front(handleManagerAccountClearSecretKey, std::ref(app)));
 }
