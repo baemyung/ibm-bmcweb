@@ -1,6 +1,7 @@
 #pragma once
 
 #include "http_body.hpp"
+#include "logging.hpp"
 #include "sessions.hpp"
 
 #include <boost/asio/io_context.hpp>
@@ -9,6 +10,7 @@
 #include <boost/beast/websocket.hpp>
 #include <boost/url/url.hpp>
 
+#include <source_location>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -33,8 +35,22 @@ struct Request : std::enable_shared_from_this<Request>
     std::shared_ptr<persistent_data::UserSession> session;
 
     std::string userRole;
+
+    inline void waitIfNeeded(
+        const std::source_location& loc = std::source_location::current())
+    {
+        std::string opPath = std::format(
+            "op={}:{} ", std::string(methodString()), std::string(target()));
+        // std::string detail =        req.body().substr(0, 128);
+
+        std::string title = std::format("Request-OpPath={}", opPath);
+        ::waitIfNeeded(title, loc);
+    }
+
     Request(Body&& reqIn, std::error_code& ec) : req(std::move(reqIn))
     {
+        waitIfNeeded();
+
         if (!setUrlInfo())
         {
             ec = std::make_error_code(std::errc::invalid_argument);
@@ -42,7 +58,9 @@ struct Request : std::enable_shared_from_this<Request>
     }
 
     Request(std::string_view bodyIn, std::error_code& /*ec*/) : req({}, bodyIn)
-    {}
+    {
+        waitIfNeeded();
+    }
 
     Request() = default;
 

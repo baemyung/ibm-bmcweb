@@ -865,13 +865,20 @@ inline void handleUpdateServicePost(
         // Setup callback for when new software detected
         monitorForSoftwareAvailable(asyncResp, req, url);
 
+        ::waitIfNeeded("handleUpdateServicePost-Bef");
+
         uploadImageFile(asyncResp->res, req.body());
+
+        ::waitIfNeeded("handleUpdateServicePost-Aft");
+
         // Not good code, goes against the bmcweb architecture but we have to
         // clear this body for memory reasons. This body can be 200+ MB.. and
         // untaring it can take up another 100MB.
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
         auto thisReq = const_cast<crow::Request*>(&req)->shared_from_this();
         thisReq->clearBody();
+
+        ::waitIfNeeded("handleUpdateServicePost-Aft-Clear");
     }
     else if (contentType.starts_with("multipart/form-data"))
     {

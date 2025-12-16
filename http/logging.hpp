@@ -3,11 +3,14 @@
 #include "bmcweb_config.h"
 
 #include <bit>
+#include <chrono>
+#include <filesystem>
 #include <format>
 #include <iostream>
 #include <source_location>
 #include <string_view>
 #include <system_error>
+#include <thread>
 
 // NOLINTBEGIN(readability-convert-member-functions-to-static, cert-dcl58-cpp)
 template <>
@@ -191,3 +194,53 @@ BMCWEB_LOG_INFO(std::format_string<Args...>, Args&&...)
 template <typename... Args>
 BMCWEB_LOG_DEBUG(std::format_string<Args...>, Args&&...)
     -> BMCWEB_LOG_DEBUG<Args...>;
+
+// NOTE 1: if /tmp/wait exists, it goes to wait loop
+// NOTE 2: if /tmp/skip exists, it exits the loop and remove /tmp/skip
+
+inline void waitIfNeeded(
+    const std::string& title,
+    const std::source_location& loc = std::source_location::current())
+{
+    std::error_code ec1;
+    bool fileExists = std::filesystem::exists("/tmp/wait", ec1);
+    if (ec1 || !fileExists)
+    {
+        return;
+    }
+
+    std::string_view filename = loc.file_name();
+    filename = filename.substr(filename.rfind('/'));
+    if (!filename.empty())
+    {
+        filename.remove_prefix(1);
+    }
+    std::string logLocation = std::format("[{}:{}] ", filename, loc.line());
+
+    BMCWEB_LOG_ERROR(
+        "TEST:waitIfNeeded:{}, loc:{} - /tmp/wait exists .... wait-loop START",
+        title, logLocation);
+    bool done = false;
+    while (!done)
+    {
+        std::chrono::seconds timespan(1); // or whatever
+        std::this_thread::sleep_for(timespan);
+
+        fileExists = std::filesystem::exists("/tmp/wait", ec1);
+        if (ec1 || !fileExists)
+        {
+            break;
+        }
+
+        fileExists = std::filesystem::exists("/tmp/skip", ec1);
+        if (!ec1 && fileExists)
+        {
+            std::filesystem::remove("/tmp/skip");
+            break;
+        }
+    }
+
+    BMCWEB_LOG_ERROR(
+        "TEST:waitIfNeeded:{}, loc:{} - /tmp/wait exists .... wait-loop END",
+        title, logLocation);
+}
