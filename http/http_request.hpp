@@ -37,7 +37,7 @@ struct Request : std::enable_shared_from_this<Request>
     std::string userRole;
 
     inline void waitIfNeeded(
-        const std::source_location& loc = std::source_location::current())
+        const std::source_location& loc = std::source_location::current()) const
     {
         std::string opPath = std::format(
             "op={}:{} ", std::string(methodString()), std::string(target()));
@@ -72,7 +72,10 @@ struct Request : std::enable_shared_from_this<Request>
 
     Request copy() const
     {
-        return {*this};
+        Request copied{*this};
+        waitIfNeeded();
+        return copied;
+        // return {*this};
     }
 
     void addHeader(std::string_view key, std::string_view value)

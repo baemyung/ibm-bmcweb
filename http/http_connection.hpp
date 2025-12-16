@@ -590,6 +590,17 @@ class Connection :
                     }
                 }
 
+                BMCWEB_LOG_ERROR(
+                    "TEST: doReadHeaders, isHeaderDone={}, isDone={}",
+                    parser->is_header_done(), parser->is_done());
+                if (parser->is_header_done())
+                {
+                    BMCWEB_LOG_ERROR(
+                        "TEST: doReadHeaders HeaderDone. method={}, target={}",
+                        parser->get().method_string(), parser->get().target());
+                    ::waitIfNeeded("HttpConnection-Hdr-Done");
+                }
+
                 std::string_view expect =
                     parser->get()[boost::beast::http::field::expect];
                 if (bmcweb::asciiIEquals(expect, "100-continue"))
