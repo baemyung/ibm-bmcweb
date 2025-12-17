@@ -6,6 +6,7 @@
 #include "http/utility.hpp"
 #include "utils/dbus_utils.hpp"
 
+#include <boost/beast/http/verb.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/url/format.hpp>
 #include <sdbusplus/asio/property.hpp>
@@ -30,6 +31,46 @@ constexpr const char* biosPurpose =
 /* @brief String that indicates a BMC software instance */
 constexpr const char* bmcPurpose =
     "xyz.openbmc_project.Software.Version.VersionPurpose.BMC";
+
+// Only allow one update at a time
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+inline bool& fwUpdateInProgress()
+{
+    static bool updateInProgress = false;
+    return updateInProgress;
+}
+
+inline bool& isUnderPostUpdateRequest()
+{
+    static bool underUpdateRequest = false;
+    return underUpdateRequest;
+}
+
+/**
+ * @brief Checks if POST request is for code update
+ * @return True if request is for code update
+ */
+inline bool checkPostForCodeUpdate(const boost::beast::http::verb method,
+                                   std::string_view target)
+{
+    if (method != boost::beast::http::verb::post)
+    {
+        return false;
+    }
+
+    return (target ==
+            "/redfish/v1/UpdateService/Actions/Oem/OemUpdateService.ConcurrentUpdate/") ||
+           (target ==
+            "/redfish/v1/UpdateService/Actions/Oem/OemUpdateService.ConcurrentUpdate") ||
+           (target == "/redfish/v1/UpdateService/update/") ||
+           (target == "/redfish/v1/UpdateService/update") ||
+           (target ==
+            "/redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate/") ||
+           (target ==
+            "/redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate");
+}
+
+// Whether
 
 /**
  * @brief Populate the running software version and image links

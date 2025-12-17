@@ -6,6 +6,7 @@
 #include "authentication.hpp"
 #include "complete_response_fields.hpp"
 #include "dump_utils.hpp"
+#include "error_messages.hpp"
 #include "http2_connection.hpp"
 #include "http_body.hpp"
 #include "http_response.hpp"
@@ -15,6 +16,7 @@
 #include "ssl_key_handler.hpp"
 #include "str_utility.hpp"
 #include "utility.hpp"
+#include "utils/sw_utils.hpp"
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/asio/io_context.hpp>
@@ -556,9 +558,29 @@ class Connection :
                 BMCWEB_LOG_DEBUG("{} async_read_header {} Bytes", logPtr(this),
                                  bytesTransferred);
 
+                bool forCodeUpdate =
+                    parser->is_header_done() &&
+                    redfish::sw_util::checkPostForCodeUpdate(
+                        parser->get().method(), parser->get().target());
+
                 if (ec)
                 {
                     cancelDeadlineTimer();
+
+                    if (forCodeUpdate)
+                    {
+                        BMCWEB_LOG_ERROR(
+                            "TEST: DO-Update-Handle handleContentLengthError ERROR-BEF, InProgress={},  underReq={}",
+                            redfish::sw_util::fwUpdateInProgress(),
+                            redfish::sw_util::isUnderPostUpdateRequest());
+
+                        redfish::sw_util::isUnderPostUpdateRequest() = false;
+
+                        BMCWEB_LOG_ERROR(
+                            "TEST: DO-Update-Handle handleContentLengthError ERROR-AFT, InProgress={},  underReq={}",
+                            redfish::sw_util::fwUpdateInProgress(),
+                            redfish::sw_util::isUnderPostUpdateRequest());
+                    }
 
                     if (ec == boost::beast::http::error::header_limit)
                     {
@@ -591,14 +613,39 @@ class Connection :
                 }
 
                 BMCWEB_LOG_ERROR(
-                    "TEST: doReadHeaders, isHeaderDone={}, isDone={}",
-                    parser->is_header_done(), parser->is_done());
-                if (parser->is_header_done())
+                    "TEST: doReadHeaders, isHeaderDone={}, isDone={}, forCodeUpdate={}",
+                    parser->is_header_done(), parser->is_done(), forCodeUpdate);
+
+                if (forCodeUpdate)
                 {
                     BMCWEB_LOG_ERROR(
-                        "TEST: doReadHeaders HeaderDone. method={}, target={}",
-                        parser->get().method_string(), parser->get().target());
-                    ::waitIfNeeded("HttpConnection-Hdr-Done");
+                        "TEST: CodeUpdate HdrRequest, InProgress={}, underReq={}",
+                        redfish::sw_util::fwUpdateInProgress(),
+                        redfish::sw_util::isUnderPostUpdateRequest());
+
+                    if (redfish::sw_util::isUnderPostUpdateRequest() ||
+                        redfish::sw_util::fwUpdateInProgress())
+                    {
+                        BMCWEB_LOG_ERROR(
+                            "TEST: NOTE THERE IS ANOTHER CODE UPDATE RUNNING, InProgress={},  underReq={}",
+                            redfish::sw_util::fwUpdateInProgress(),
+                            redfish::sw_util::isUnderPostUpdateRequest());
+
+                        cancelDeadlineTimer();
+                        redfish::messages::serviceTemporarilyUnavailable(res,
+                                                                         "30");
+                        keepAlive = false;
+                        doWrite();
+
+                        return;
+                    }
+
+                    redfish::sw_util::isUnderPostUpdateRequest() = true;
+
+                    BMCWEB_LOG_ERROR(
+                        "TEST: CodeUpdate HdrRequest--PROCEED, InProgress={}, underReq={}",
+                        redfish::sw_util::fwUpdateInProgress(),
+                        redfish::sw_util::isUnderPostUpdateRequest());
                 }
 
                 std::string_view expect =
@@ -619,7 +666,29 @@ class Connection :
 
                 if (parser->is_done())
                 {
+                    if (forCodeUpdate)
+                    {
+                        BMCWEB_LOG_ERROR(
+                            "TEST: DO-Update-Handle -- BODY BEGIN, InProgress={},  underReq={}",
+                            redfish::sw_util::fwUpdateInProgress(),
+                            redfish::sw_util::isUnderPostUpdateRequest());
+                    }
+
                     handle();
+
+                    if (forCodeUpdate)
+                    {
+                        // redfish::sw_util::isUnderPostUpdateRequest() = false;
+                    }
+
+                    if (forCodeUpdate)
+                    {
+                        BMCWEB_LOG_ERROR(
+                            "TEST: DO-Update-Handle -- BODY DONE, InProgress={},  underReq={}",
+                            redfish::sw_util::fwUpdateInProgress(),
+                            redfish::sw_util::isUnderPostUpdateRequest());
+                    }
+
                     return;
                 }
 
@@ -643,10 +712,31 @@ class Connection :
                 BMCWEB_LOG_DEBUG("{} async_read_some {} Bytes", logPtr(this),
                                  bytesTransferred);
 
+                bool forCodeUpdate =
+                    parser->is_header_done() &&
+                    redfish::sw_util::checkPostForCodeUpdate(
+                        parser->get().method(), parser->get().target());
+
                 if (ec)
                 {
                     BMCWEB_LOG_ERROR("{} Error while reading: {}", logPtr(this),
                                      ec.message());
+
+                    if (forCodeUpdate)
+                    {
+                        BMCWEB_LOG_ERROR(
+                            "TEST: DO-Update-Handle handleContentLengthError ERROR-BEF, InProgress={},  underReq={}",
+                            redfish::sw_util::fwUpdateInProgress(),
+                            redfish::sw_util::isUnderPostUpdateRequest());
+
+                        redfish::sw_util::isUnderPostUpdateRequest() = false;
+
+                        BMCWEB_LOG_ERROR(
+                            "TEST: DO-Update-Handle handleContentLengthError ERROR-AFT, InProgress={},  underReq={}",
+                            redfish::sw_util::fwUpdateInProgress(),
+                            redfish::sw_util::isUnderPostUpdateRequest());
+                    }
+
                     if (ec == boost::beast::http::error::body_limit)
                     {
                         if (handleContentLengthError())
@@ -683,7 +773,28 @@ class Connection :
                 }
 
                 cancelDeadlineTimer();
+                if (forCodeUpdate)
+                {
+                    BMCWEB_LOG_ERROR(
+                        "TEST: doRead:: DO-Update-Handle -- BODY BEGIN, InProgress={},  underReq={}",
+                        redfish::sw_util::fwUpdateInProgress(),
+                        redfish::sw_util::isUnderPostUpdateRequest());
+                }
+
                 handle();
+
+                if (forCodeUpdate)
+                {
+                    // redfish::sw_util::isUnderPostUpdateRequest() = false;
+                }
+
+                if (forCodeUpdate)
+                {
+                    BMCWEB_LOG_ERROR(
+                        "TEST: doRead:: DO-Update-Handle -- BODY DONE, InProgress={},  underReq={}",
+                        redfish::sw_util::fwUpdateInProgress(),
+                        redfish::sw_util::isUnderPostUpdateRequest());
+                }
             });
     }
 

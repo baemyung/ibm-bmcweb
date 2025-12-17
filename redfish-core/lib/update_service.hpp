@@ -59,16 +59,18 @@ namespace redfish
 static std::unique_ptr<sdbusplus::bus::match_t> fwUpdateMatcher;
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static std::unique_ptr<sdbusplus::bus::match_t> fwUpdateErrorMatcher;
-// Only allow one update at a time
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-static bool fwUpdateInProgress = false;
+
 // Timer for software available
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static std::unique_ptr<boost::asio::steady_timer> fwAvailableTimer;
 
 inline void cleanUp()
 {
-    fwUpdateInProgress = false;
+    sw_util::fwUpdateInProgress() = false;
+
+    BMCWEB_LOG_ERROR("TEST: cleanUp fwUpdateInProgress = {}",
+                     sw_util::fwUpdateInProgress());
+
     fwUpdateMatcher = nullptr;
     fwUpdateErrorMatcher = nullptr;
 }
@@ -380,7 +382,11 @@ static void
                         task->populateResp(asyncResp->res);
                         task->payload.emplace(std::move(payload));
                     }
-                    fwUpdateInProgress = false;
+                    sw_util::fwUpdateInProgress() = false;
+
+                    BMCWEB_LOG_ERROR(
+                        "TEST: softwareInterfaceAdded fwUpdateInProgress = {}",
+                        sw_util::fwUpdateInProgress());
                 });
 
             break;
@@ -518,7 +524,7 @@ static void monitorForSoftwareAvailable(
     int timeoutTimeSeconds = 50)
 {
     // Only allow one FW update at a time
-    if (fwUpdateInProgress)
+    if (sw_util::fwUpdateInProgress())
     {
         if (asyncResp)
         {
@@ -547,7 +553,11 @@ static void monitorForSoftwareAvailable(
         softwareInterfaceAdded(asyncResp, m, std::move(payload));
     };
 
-    fwUpdateInProgress = true;
+    sw_util::fwUpdateInProgress() = true;
+
+    BMCWEB_LOG_ERROR(
+        "TEST: monitorForSoftwareAvailable fwUpdateInProgress = {}",
+        sw_util::fwUpdateInProgress());
 
     fwUpdateMatcher = std::make_unique<sdbusplus::bus::match_t>(
         *crow::connections::systemBus,
@@ -858,6 +868,10 @@ inline void handleUpdateServicePost(
 
     BMCWEB_LOG_DEBUG("doPost: contentType={}", contentType);
 
+    redfish::sw_util::isUnderPostUpdateRequest() = true;
+    BMCWEB_LOG_ERROR("TEST:handleUpdateServicePost BEGIN underReq={}",
+                     redfish::sw_util::isUnderPostUpdateRequest());
+
     // Make sure that content type is application/octet-stream or
     // multipart/form-data
     if (bmcweb::asciiIEquals(contentType, "application/octet-stream"))
@@ -907,6 +921,10 @@ inline void handleUpdateServicePost(
         BMCWEB_LOG_DEBUG("Bad content type specified:{}", contentType);
         asyncResp->res.result(boost::beast::http::status::bad_request);
     }
+
+    redfish::sw_util::isUnderPostUpdateRequest() = false;
+    BMCWEB_LOG_ERROR("TEST:handleUpdateServicePost END underReq={}",
+                     redfish::sw_util::isUnderPostUpdateRequest());
 }
 
 /**

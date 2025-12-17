@@ -43,7 +43,7 @@ struct Request : std::enable_shared_from_this<Request>
             "op={}:{} ", std::string(methodString()), std::string(target()));
         // std::string detail =        req.body().substr(0, 128);
 
-        std::string title = std::format("Request-OpPath={}", opPath);
+        std::string title = std::format("Request::OpPath={}", opPath);
         ::waitIfNeeded(title, loc);
     }
 
