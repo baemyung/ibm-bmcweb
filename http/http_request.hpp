@@ -16,6 +16,7 @@
 #include <boost/url/url.hpp>
 #include <boost/url/url_view.hpp>
 
+#include <format>
 #include <memory>
 #include <source_location>
 #include <string>
@@ -43,14 +44,14 @@ struct Request : std::enable_shared_from_this<Request>
 
     std::string userRole;
 
-    inline void waitIfNeeded(
+    void waitIfNeeded(
         const std::source_location& loc = std::source_location::current()) const
     {
         std::string opPath = std::format(
             "op={}:{} ", std::string(methodString()), std::string(target()));
         // std::string detail =        req.body().substr(0, 128);
 
-        std::string title = std::format("Request-OpPath={}", opPath);
+        std::string title = std::format("Request::OpPath={}", opPath);
         ::waitIfNeeded(title, loc);
     }
 

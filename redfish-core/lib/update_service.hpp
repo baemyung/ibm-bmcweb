@@ -39,6 +39,7 @@
 #include <boost/beast/http/status.hpp>
 #include <boost/beast/http/verb.hpp>
 #include <boost/range/adaptor/reversed.hpp>
+#include <boost/system/errc.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/system/result.hpp>
 #include <boost/url/format.hpp>
@@ -63,6 +64,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <source_location>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -78,9 +80,7 @@ namespace redfish
 static std::unique_ptr<sdbusplus::bus::match_t> fwUpdateMatcher;
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static std::unique_ptr<sdbusplus::bus::match_t> fwUpdateErrorMatcher;
-// Only allow one update at a time
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-static bool fwUpdateInProgress = false;
+
 // Timer for software available
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static std::unique_ptr<boost::asio::steady_timer> fwAvailableTimer;
@@ -120,9 +120,21 @@ struct MemoryFileDescriptor
     }
 };
 
-inline void cleanUp()
+inline void cleanUp(
+    bool clearInProgress = true,
+    const std::source_location& loc = std::source_location::current())
 {
-    fwUpdateInProgress = false;
+    bool prevProgress = sw_util::fwUpdateInProgress();
+    if (clearInProgress)
+    {
+        sw_util::fwUpdateInProgress() = false;
+    }
+
+    BMCWEB_LOG_ERROR(
+        "TEST: cleanUp fwUpdateInProgress: from={} to {}, loc={}:{}",
+        prevProgress, sw_util::fwUpdateInProgress(), loc.file_name(),
+        loc.line());
+
     fwUpdateMatcher = nullptr;
     fwUpdateErrorMatcher = nullptr;
 }
@@ -140,6 +152,7 @@ inline void activateImage(const std::string& objPath,
             {
                 BMCWEB_LOG_DEBUG("error_code = {}", ec);
                 BMCWEB_LOG_DEBUG("error msg = {}", ec.message());
+                cleanUp();
             }
         });
 }
@@ -248,8 +261,12 @@ inline bool handleCreateTask(const boost::system::error_code& ec2,
                              sdbusplus::message_t& msg,
                              const std::shared_ptr<task::TaskData>& taskData)
 {
+    // BMCWEB_LOG_ERROR("TEST: handleCreateTask BEGIN");
+
     if (ec2)
     {
+        BMCWEB_LOG_ERROR("TEST: handleCreateTask COMPLETED, ec2={}", ec2);
+        cleanUp();
         return task::completed;
     }
 
@@ -258,6 +275,8 @@ inline bool handleCreateTask(const boost::system::error_code& ec2,
 
     std::string index = std::to_string(taskData->index);
     msg.read(iface, values);
+
+    BMCWEB_LOG_ERROR("TEST: handleCreateTask, iface={}", iface);
 
     if (iface == "xyz.openbmc_project.Software.Activation")
     {
@@ -270,6 +289,8 @@ inline bool handleCreateTask(const boost::system::error_code& ec2,
                 if (state == nullptr)
                 {
                     taskData->messages.emplace_back(messages::internalError());
+                    BMCWEB_LOG_ERROR("TEST: handleCreateTask COMPLETED");
+                    cleanUp();
                     return task::completed;
                 }
             }
@@ -277,6 +298,8 @@ inline bool handleCreateTask(const boost::system::error_code& ec2,
 
         if (state == nullptr)
         {
+            BMCWEB_LOG_ERROR(
+                "TEST: handleCreateTask not-completed, state=nullptr");
             return !task::completed;
         }
 
@@ -285,6 +308,8 @@ inline bool handleCreateTask(const boost::system::error_code& ec2,
             taskData->state = "Exception";
             taskData->status = "Warning";
             updateErrorLogMessage(taskData, index);
+            BMCWEB_LOG_ERROR("TEST: handleCreateTask COMPLETED, state={}",
+                             *state);
             return task::completed;
         }
 
@@ -299,6 +324,8 @@ inline bool handleCreateTask(const boost::system::error_code& ec2,
             // system) if this expires then
             // task will be canceled
             taskData->extendTimer(std::chrono::hours(5));
+            BMCWEB_LOG_ERROR("TEST: handleCreateTask not-completed, state={}",
+                             *state);
             return !task::completed;
         }
 
@@ -306,6 +333,9 @@ inline bool handleCreateTask(const boost::system::error_code& ec2,
         {
             taskData->messages.emplace_back(messages::taskCompletedOK(index));
             taskData->state = "Completed";
+            BMCWEB_LOG_ERROR("TEST: handleCreateTask COMPLETED state={}",
+                             *state);
+            cleanUp();
             return task::completed;
         }
     }
@@ -320,6 +350,9 @@ inline bool handleCreateTask(const boost::system::error_code& ec2,
                 if (progress == nullptr)
                 {
                     taskData->messages.emplace_back(messages::internalError());
+                    BMCWEB_LOG_ERROR(
+                        "TEST: handleCreateTask COMPLETED, internalError");
+                    cleanUp();
                     return task::completed;
                 }
             }
@@ -327,6 +360,8 @@ inline bool handleCreateTask(const boost::system::error_code& ec2,
 
         if (progress == nullptr)
         {
+            BMCWEB_LOG_ERROR(
+                "TEST: handleCreateTask not-completed, progress=nullptr");
             return !task::completed;
         }
         taskData->percentComplete = *progress;
@@ -336,12 +371,13 @@ inline bool handleCreateTask(const boost::system::error_code& ec2,
         // if we're getting status updates it's
         // still alive, update timer
         taskData->extendTimer(std::chrono::minutes(5));
+        BMCWEB_LOG_ERROR("TEST: handleCreateTask, progress={}", *progress);
     }
 
     // as firmware update often results in a
     // reboot, the task  may never "complete"
     // unless it is an error
-
+    BMCWEB_LOG_ERROR("TEST: handleCreateTask not-completed");
     return !task::completed;
 }
 
@@ -412,16 +448,25 @@ inline void softwareInterfaceAdded(
                         return;
                     }
                     // cancel timer only when
-                    // xyz.openbmc_project.Software.Activation interface
-                    // is added
+                    // xyz.openbmc_project.Software.Activation interface is
+                    // added.
+                    //
+                    // Keep `fwUpdateInProgress` flag.
+                    // bool prevUpdateInProgress =
+                    // sw_util::fwUpdateInProgress();
                     fwAvailableTimer = nullptr;
+                    // sw_util::fwUpdateInProgress() = prevUpdateInProgress;
 
                     activateImage(objPath.str, objInfo[0].first);
                     if (asyncResp)
                     {
                         createTask(asyncResp, std::move(payload), objPath);
                     }
-                    fwUpdateInProgress = false;
+                    sw_util::fwUpdateInProgress() = false;
+
+                    BMCWEB_LOG_ERROR(
+                        "TEST: softwareInterfaceAdded fwUpdateInProgress = {}",
+                        sw_util::fwUpdateInProgress());
                 });
 
             break;
@@ -433,12 +478,26 @@ inline void afterAvailbleTimerAsyncWait(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     const boost::system::error_code& ec)
 {
+    BMCWEB_LOG_ERROR("TEST: afterAvailbleTimerAsyncWait, ec={}, InProgress={}",
+                     ec, sw_util::fwUpdateInProgress());
+
+    if (ec == boost::system::errc::operation_canceled)
+    {
+        BMCWEB_LOG_ERROR("TEST: fwAvailableTimer operation_canceled");
+    }
+
+    if (ec == boost::asio::error::operation_aborted)
+    {
+        BMCWEB_LOG_ERROR("TEST: fwAvailableTimer operation_aborted");
+    }
+
     cleanUp();
     if (ec == boost::asio::error::operation_aborted)
     {
         // expected, we were canceled before the timer completed.
         return;
     }
+
     BMCWEB_LOG_ERROR("Timed out waiting for firmware object being created");
     BMCWEB_LOG_ERROR("FW image may has already been uploaded to server");
     if (ec)
@@ -549,10 +608,10 @@ inline void afterUpdateErrorMatcher(
 inline void monitorForSoftwareAvailable(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     const crow::Request& req, const std::string& url,
-    int timeoutTimeSeconds = 50)
+    int timeoutTimeSeconds = 180)
 {
     // Only allow one FW update at a time
-    if (fwUpdateInProgress)
+    if (sw_util::fwUpdateInProgress())
     {
         if (asyncResp)
         {
@@ -575,7 +634,11 @@ inline void monitorForSoftwareAvailable(
         softwareInterfaceAdded(asyncResp, m, std::move(payload));
     };
 
-    fwUpdateInProgress = true;
+    sw_util::fwUpdateInProgress() = true;
+
+    BMCWEB_LOG_ERROR(
+        "TEST: monitorForSoftwareAvailable fwUpdateInProgress = {}",
+        sw_util::fwUpdateInProgress());
 
     fwUpdateMatcher = std::make_unique<sdbusplus::bus::match_t>(
         *crow::connections::systemBus,
@@ -727,6 +790,9 @@ inline void handleUpdateServiceSimpleUpdateAction(
 
 inline void uploadImageFile(crow::Response& res, std::string_view body)
 {
+    BMCWEB_LOG_ERROR(":TEST: uploadImageFile BEGIN, InProgress={}",
+                     sw_util::fwUpdateInProgress());
+
     std::filesystem::path filepath("/tmp/images/" + bmcweb::getRandomUUID());
 
     BMCWEB_LOG_DEBUG("Writing file to {}", filepath.string());
@@ -743,6 +809,9 @@ inline void uploadImageFile(crow::Response& res, std::string_view body)
         messages::internalError(res);
         cleanUp();
     }
+
+    BMCWEB_LOG_ERROR(":TEST: uploadImageFile END, InProgress={}",
+                     sw_util::fwUpdateInProgress());
 }
 
 // Convert the Request Apply Time to the D-Bus value
@@ -1162,6 +1231,11 @@ inline void handleUpdateServicePost(
 
     BMCWEB_LOG_DEBUG("doPost: contentType={}", contentType);
 
+    BMCWEB_LOG_ERROR(
+        "TEST:TEST: handleUpdateServicePost BEGIN-BEGIN-BEGIN underReq={}, fwProgress={}",
+        redfish::sw_util::isUnderPostUpdateRequest(),
+        sw_util::fwUpdateInProgress());
+
     // Make sure that content type is application/octet-stream or
     // multipart/form-data
     if (bmcweb::asciiIEquals(contentType, "application/octet-stream"))
@@ -1195,6 +1269,11 @@ inline void handleUpdateServicePost(
         BMCWEB_LOG_DEBUG("Bad content type specified:{}", contentType);
         asyncResp->res.result(boost::beast::http::status::bad_request);
     }
+
+    BMCWEB_LOG_ERROR(
+        "TEST:TEST: handleUpdateServicePost END-END-END underReq={}, fwProgress={}",
+        redfish::sw_util::isUnderPostUpdateRequest(),
+        sw_util::fwUpdateInProgress());
 }
 
 /**
