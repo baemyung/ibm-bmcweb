@@ -27,6 +27,42 @@
 namespace redfish
 {
 
+inline void checkAndCreateSecretKey(
+    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
+    const std::string& username, const std::string& userPath,
+    const boost::system::error_code& ec, bool isSecretKeySet)
+{
+    if (ec)
+    {
+        BMCWEB_LOG_ERROR("D-Bus response error: {}", ec.value());
+        messages::internalError(asyncResp->res);
+        return;
+    }
+
+    if (isSecretKeySet)
+    {
+        BMCWEB_LOG_WARNING("Secret key is already setup for the user");
+        messages::actionNotSupported(asyncResp->res, "GenerateSecretKey");
+        return;
+    }
+
+    // If secret key is not set, then proceed to create it
+    dbus::utility::async_method_call(
+        [asyncResp, username](const boost::system::error_code& ec1,
+                              const std::string& secretKey) {
+            if (ec1)
+            {
+                BMCWEB_LOG_ERROR("D-Bus response error: {}", ec1.value());
+                messages::internalError(asyncResp->res);
+                return;
+            }
+
+            asyncResp->res.jsonValue["SecretKey"] = secretKey;
+        },
+        "xyz.openbmc_project.User.Manager", userPath,
+        "xyz.openbmc_project.User.TOTPAuthenticator", "CreateSecretKey");
+}
+
 inline void createSecretKeyUtil(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     const std::string& username, const std::string& userPath)
@@ -36,37 +72,8 @@ inline void createSecretKeyUtil(
         "xyz.openbmc_project.User.TOTPAuthenticator", "SecretKeyIsValid",
         [asyncResp, username, userPath](const boost::system::error_code& ec,
                                         const bool isSecretKeySet) {
-            if (ec)
-            {
-                BMCWEB_LOG_ERROR("D-Bus response error: {}", ec.value());
-                messages::internalError(asyncResp->res);
-                return;
-            }
-
-            if (isSecretKeySet)
-            {
-                BMCWEB_LOG_WARNING("Secret key is already setup for the user");
-                messages::actionNotSupported(asyncResp->res,
-                                             "GenerateSecretKey");
-                return;
-            }
-
-            // If secret key is not set, then proceed to create it
-            dbus::utility::async_method_call(
-                [asyncResp, username](const boost::system::error_code& ec1,
-                                      const std::string& secretKey) {
-                    if (ec1)
-                    {
-                        BMCWEB_LOG_ERROR("D-Bus response error: {}",
-                                         ec1.value());
-                        messages::internalError(asyncResp->res);
-                        return;
-                    }
-                    asyncResp->res.jsonValue["SecretKey"] = secretKey;
-                },
-                "xyz.openbmc_project.User.Manager", userPath,
-                "xyz.openbmc_project.User.TOTPAuthenticator",
-                "CreateSecretKey");
+            checkAndCreateSecretKey(asyncResp, username, userPath, ec,
+                                    isSecretKeySet);
         });
 }
 
