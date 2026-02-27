@@ -2784,10 +2784,11 @@ inline void handleLogServicesDumpClearLogComputerSystemPost(
 
 inline void displayOemPelAttachment(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-    const std::string& entryID)
+    const boost::urls::url& urlLogEntryPrefix, const std::string& entryID)
 {
-    auto respHandler = [asyncResp, entryID](const boost::system::error_code& ec,
-                                            const std::string& pelJson) {
+    auto respHandler = [asyncResp, urlLogEntryPrefix,
+                        entryID](const boost::system::error_code& ec,
+                                 const std::string& pelJson) {
         if (ec.value() == EBADR)
         {
             messages::resourceNotFound(asyncResp->res, "OemPelAttachment",
@@ -2800,6 +2801,14 @@ inline void displayOemPelAttachment(
             messages::internalError(asyncResp->res);
             return;
         }
+
+        asyncResp->res.jsonValue["@odata.id"] = boost::urls::format(
+            "{}/{}/OemPelAttachment", urlLogEntryPrefix, entryID);
+        asyncResp->res.jsonValue["@odata.type"] =
+            "#IBMLogEntryAttachment.v1_0_0.IBMLogEntryAttachment";
+
+        asyncResp->res.jsonValue["Name"] = "OemPelAttachment";
+        asyncResp->res.jsonValue["Id"] = "OemPelAttachment";
 
         asyncResp->res.jsonValue["Oem"]["IBM"]["PelJson"] = pelJson;
         asyncResp->res.jsonValue["Oem"]["IBM"]["@odata.type"] =
@@ -2868,7 +2877,11 @@ inline void requestRoutesDBusEventLogEntryDownloadPelJson(App& app)
                                                        "LogEntry", entryID);
                             return;
                         }
-                        displayOemPelAttachment(asyncResp, entryID);
+                        boost::urls::url urlLogEntryPrefix = boost::urls::format(
+                            "/redfish/v1/Systems/{}/LogServices/EventLog/Entries",
+                            BMCWEB_REDFISH_SYSTEM_URI_NAME);
+                        displayOemPelAttachment(asyncResp, urlLogEntryPrefix,
+                                                entryID);
                     });
             });
 }
