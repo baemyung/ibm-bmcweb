@@ -492,7 +492,7 @@ inline void objectPropertiesToJson(
 
         if (chassisSubNode == ChassisSubNode::sensorsNode)
         {
-            sensorJson["@odata.type"] = "#Sensor.v1_2_0.Sensor";
+            sensorJson["@odata.type"] = "#Sensor.v1_7_0.Sensor";
 
             sensor::ReadingType readingType =
                 sensors::toReadingType(sensorType);
