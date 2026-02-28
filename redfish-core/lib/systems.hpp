@@ -2829,7 +2829,9 @@ inline void handleComputerSystemGet(
     getEnabledPanelFunctions(asyncResp);
 
     nlohmann::json& actionOem = asyncResp->res.jsonValue["Actions"]["Oem"];
-    actionOem["#IBMComputerSystem.v1_0_0.ExecutePanelFunction"]["target"] =
+    actionOem["@odata.type"] = "#IBMComputerSystem.v1_0_0.OemActions";
+    actionOem["IBM"]["@odata.type"] = "#IBMComputerSystem.v1_0_0.OemIBMActions";
+    actionOem["IBM"]["#IBMComputerSystem.ExecutePanelFunction"]["target"] =
         "/redfish/v1/Systems/system/Actions/Oem/IBM/IBMComputerSystem.ExecutePanelFunction";
 
     // ChapData
