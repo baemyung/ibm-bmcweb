@@ -1245,8 +1245,8 @@ inline void handleUpdateServiceGet(
     asyncResp->res.jsonValue["MaxImageSizeBytes"] =
         BMCWEB_HTTP_BODY_LIMIT * 1024 * 1024;
     nlohmann::json& updateSvcConUpdate =
-        asyncResp->res.jsonValue["Actions"]["Oem"]
-                                ["#OemUpdateService.v1_0_0.ConcurrentUpdate"];
+        asyncResp->res
+            .jsonValue["Actions"]["Oem"]["#OemUpdateService.ConcurrentUpdate"];
     updateSvcConUpdate["target"] =
         "/redfish/v1/UpdateService/Actions/Oem/OemUpdateService.ConcurrentUpdate";
 

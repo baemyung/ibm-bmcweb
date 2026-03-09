@@ -335,7 +335,12 @@ inline void requestRoutesDBusCELogEntryDownloadPelJson(App& app)
                                                        "LogEntry", entryID);
                             return;
                         }
-                        displayOemPelAttachment(asyncResp, entryID);
+
+                        boost::urls::url urlLogEntryPrefix = boost::urls::format(
+                            "/redfish/v1/Systems/{}/LogServices/CELog/Entries",
+                            BMCWEB_REDFISH_SYSTEM_URI_NAME);
+                        displayOemPelAttachment(asyncResp, urlLogEntryPrefix,
+                                                entryID);
                     });
             });
 }
