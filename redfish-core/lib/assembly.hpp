@@ -142,7 +142,8 @@ inline void
                 "/xyz/openbmc_project/object_mapper",
                 "xyz.openbmc_project.ObjectMapper", "GetObject",
                 "/xyz/openbmc_project/sensors/voltage/Battery_Voltage",
-                std::array<const char*, 0>{});
+                std::array<const char*, 1>{
+                    "xyz.openbmc_project.State.Decorator.OperationalStatus"});
         }
 
         crow::connections::systemBus->async_method_call(
