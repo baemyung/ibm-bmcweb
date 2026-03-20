@@ -30,7 +30,7 @@ namespace redfish
 inline void afterGetReadyToRemoveOfTodBattery(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     std::size_t assemblyIndex, const boost::system::error_code& ec,
-    const dbus::utility::MapperGetObject& /*unused*/)
+    const dbus::utility::MapperGetObject& object)
 {
     nlohmann::json& assemblyArray = asyncResp->res.jsonValue["Assemblies"];
     if (ec)
@@ -49,6 +49,7 @@ inline void afterGetReadyToRemoveOfTodBattery(
         messages::internalError(asyncResp->res);
         return;
     }
+
     nlohmann::json& oemOpenBMC =
         assemblyArray.at(assemblyIndex)["Oem"]["OpenBMC"];
     oemOpenBMC["@odata.type"] = "#OpenBMCAssembly.v1_0_0.OpenBMC";
@@ -59,8 +60,10 @@ inline void getReadyToRemoveOfTodBattery(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     std::size_t assemblyIndex)
 {
+    constexpr std::array<std::string_view, 1> interfaces = {
+        "xyz.openbmc_project.State.Decorator.OperationalStatus"};
     dbus::utility::getDbusObject(
-        "/xyz/openbmc_project/sensors/voltage/Battery_Voltage", {},
+        "/xyz/openbmc_project/sensors/voltage/Battery_Voltage", interfaces,
         std::bind_front(afterGetReadyToRemoveOfTodBattery, asyncResp,
                         assemblyIndex));
 }
