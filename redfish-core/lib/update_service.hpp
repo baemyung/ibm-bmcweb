@@ -18,6 +18,7 @@
 #include "logging.hpp"
 #include "multipart_parser.hpp"
 #include "oem_messages.hpp"
+#include "openbmc_messages.hpp"
 #include "ossl_random.hpp"
 #include "query.hpp"
 #include "registries/privilege_registry.hpp"

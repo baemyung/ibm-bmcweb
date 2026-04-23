@@ -367,7 +367,7 @@ def make_error_function(
             arg_param = f"std::to_array{to_array_type}({{{argstring}}})"
         out += f"    return getLog(redfish::registries::{struct_name}::Index::{function_name}, {arg_param});"
         out += "\n}\n\n"
-    if registry_name == "Base" or registry_name == "License":
+    if registry_name == "Base" or registry_name == "License" or registry_name == "Openbmc":
         args.insert(0, "crow::Response& res")
         if entry_id == "InternalError":
             if is_header:
@@ -438,13 +438,6 @@ def create_error_registry(
     file, json_dict, namespace, url = registry_info
     base_filename = filename + "_messages"
     struct_name = to_pascal_case(namespace_name)
-
-    # Note, this message doesn't exist in DMTF.  Needs cleaned up at some point
-    json_dict["Messages"]["InvalidUpload"] = {
-        "Message": "Invalid file uploaded to %1: %2.*",
-        "ParamTypes": ["string", "string"],
-    }
-
     error_messages_hpp = os.path.join(
         SCRIPT_DIR, "..", "redfish-core", "include", f"{base_filename}.hpp"
     )
@@ -531,6 +524,9 @@ namespace messages
             headers.append('"error_message_utils.hpp"')
             headers.append('"http_response.hpp"')
             headers.append("<boost/beast/http/status.hpp>")
+        elif registry_name == "Openbmc":
+            headers.append('"error_message_utils.hpp"')
+            headers.append('"http_response.hpp"')
         reg_name_lower = namespace_name.lower()
         headers.append(f'"registries/{reg_name_lower}_message_registry.hpp"')
 
@@ -735,6 +731,13 @@ def main() -> None:
             "Base",
             "base",
             "error",
+        )
+    if "openbmc" in registries_map:
+        create_error_registry(
+            registries_map["openbmc"],
+            "Openbmc",
+            "openbmc",
+            "openbmc",
         )
     if "heartbeat_event" in registries_map:
         create_error_registry(

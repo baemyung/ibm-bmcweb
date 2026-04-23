@@ -2295,41 +2295,6 @@ void licenseRequired(crow::Response& res, std::string_view arg1)
     addMessageToErrorJson(res.jsonValue, licenseRequired(arg1));
 }
 
-void invalidUpload(crow::Response& res, std::string_view arg1,
-                   std::string_view arg2)
-{
-    res.result(boost::beast::http::status::bad_request);
-    addMessageToErrorJson(res.jsonValue, invalidUpload(arg1, arg2));
-}
-
-/**
- * @internal
- * @brief Formats Invalid File message into JSON
- *
- * See header file for more information
- * @endinternal
- */
-nlohmann::json invalidUpload(std::string_view arg1, std::string_view arg2)
-{
-    std::string msg = "Invalid file uploaded to ";
-    msg += arg1;
-    msg += ": ";
-    msg += arg2;
-    msg += ".";
-
-    nlohmann::json::object_t ret;
-    ret["@odata.type"] = "/redfish/v1/$metadata#Message.v1_1_1.Message";
-    ret["MessageId"] = "OpenBMC.0.2.InvalidUpload";
-    ret["Message"] = std::move(msg);
-    nlohmann::json::array_t args;
-    args.emplace_back(arg1);
-    args.emplace_back(arg2);
-    ret["MessageArgs"] = std::move(args);
-    ret["MessageSeverity"] = "Warning";
-    ret["Resolution"] = "None.";
-    return ret;
-}
-
 /**
  * @internal
  * @brief Formats PropertyModified message into JSON
