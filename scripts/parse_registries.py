@@ -245,6 +245,7 @@ def get_response_code(entry_id: str) -> str | None:
         "OperationNotAllowed": "method_not_allowed",
         "OperationTimeout": "internal_server_error",
         "PasswordChangeRequired": None,
+        "InvalidUpload": "bad_request",
         "PreconditionFailed": "precondition_failed",
         "PropertyNotWritable": "method_not_allowed",
         "PropertyValueExternalConflict": "conflict",
@@ -437,6 +438,12 @@ def create_error_registry(
     file, json_dict, namespace, url = registry_info
     base_filename = filename + "_messages"
     struct_name = to_pascal_case(namespace_name)
+
+    # Note, this message doesn't exist in DMTF.  Needs cleaned up at some point
+    json_dict["Messages"]["InvalidUpload"] = {
+        "Message": "Invalid file uploaded to %1: %2.*",
+        "ParamTypes": ["string", "string"],
+    }
 
     error_messages_hpp = os.path.join(
         SCRIPT_DIR, "..", "redfish-core", "include", f"{base_filename}.hpp"
