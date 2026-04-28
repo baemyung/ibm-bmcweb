@@ -263,8 +263,16 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
 
     void doSslHandshake()
     {
+        if (isShuttingDown)
+        {
+            BMCWEB_LOG_DEBUG("Connection shutting down, skipping SSL handshake");
+            return;
+        }
         if (!sslConn)
         {
+            BMCWEB_LOG_ERROR("SSL connection not initialized");
+            state = ConnState::sslInitFailed;
+            waitAndRetry();
             return;
         }
         auto& ssl = *sslConn;
@@ -302,6 +310,11 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
 
     void sendMessage()
     {
+        if (isShuttingDown)
+        {
+            BMCWEB_LOG_DEBUG("Connection shutting down, skipping send");
+            return;
+        }
         state = ConnState::sendInProgress;
 
         // Set a timeout on the operation
@@ -350,6 +363,11 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
 
     void recvMessage()
     {
+        if (isShuttingDown)
+        {
+            BMCWEB_LOG_DEBUG("Connection shutting down, skipping receive");
+            return;
+        }
         state = ConnState::recvInProgress;
 
         parser_type& thisParser = parser.emplace();
@@ -400,22 +418,27 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
                          bytesTransferred);
         if (!parser)
         {
+            BMCWEB_LOG_ERROR("Parser not initialized");
+            state = ConnState::recvFailed;
+            waitAndRetry();
             return;
         }
-        BMCWEB_LOG_DEBUG("recvMessage() data: {}", parser->get().body().str());
-
-        unsigned int respCode = parser->get().result_int();
-        BMCWEB_LOG_DEBUG("recvMessage() Header Response Code: {}", respCode);
 
         // Handle the case of stream_truncated.  Some servers close the ssl
         // connection uncleanly, so check to see if we got a full response
         // before we handle this as an error.
         if (!parser->is_done())
         {
+            BMCWEB_LOG_ERROR("Parser incomplete, response truncated");
             state = ConnState::recvFailed;
             waitAndRetry();
             return;
         }
+
+        BMCWEB_LOG_DEBUG("recvMessage() data: {}", parser->get().body().str());
+
+        unsigned int respCode = parser->get().result_int();
+        BMCWEB_LOG_DEBUG("recvMessage() Header Response Code: {}", respCode);
 
         // Make sure the received response code is valid as defined by
         // the associated retry policy
@@ -475,13 +498,29 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         std::shared_ptr<ConnectionInfo> self = weakSelf.lock();
         if (self == nullptr)
         {
+            BMCWEB_LOG_DEBUG("ConnectionInfo destroyed, skipping timeout handler");
             return;
         }
+        
+        // Check if connection is shutting down
+        if (self->isShuttingDown)
+        {
+            BMCWEB_LOG_DEBUG("Connection shutting down, skipping timeout handler");
+            return;
+        }
+        
+        BMCWEB_LOG_ERROR("Operation timed out for connection id: {}", self->connId);
         self->waitAndRetry();
     }
 
     void waitAndRetry()
     {
+        if (isShuttingDown)
+        {
+            BMCWEB_LOG_DEBUG("Connection shutting down, skipping retry");
+            return;
+        }
+        
         if ((retryCount >= connPolicy->maxRetryAttempts) ||
             (state == ConnState::sslInitFailed))
         {
@@ -527,6 +566,12 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
     void onTimerDone(const std::shared_ptr<ConnectionInfo>& /*self*/,
                      const boost::system::error_code& ec)
     {
+        if (isShuttingDown)
+        {
+            BMCWEB_LOG_DEBUG("Connection shutting down, skipping timer callback");
+            return;
+        }
+        
         if (ec == boost::asio::error::operation_aborted)
         {
             BMCWEB_LOG_DEBUG(
