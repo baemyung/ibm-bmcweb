@@ -173,6 +173,12 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
 
     void doResolve()
     {
+        if (isShuttingDown)
+        {
+            BMCWEB_LOG_DEBUG("Connection shutting down, skipping resolve");
+            return;
+        }
+        
         state = ConnState::resolveInProgress;
         BMCWEB_LOG_DEBUG("Trying to resolve: {}, id: {}", host, connId);
         boost::urls::host_type hostType = host.host_type();
@@ -196,6 +202,8 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
             BMCWEB_LOG_ERROR(
                 "Failed to parse already-parsed ip address.  This should not happen {}",
                 host.host_address());
+            state = ConnState::resolveFailed;
+            waitAndRetry();
             return;
         }
         boost::asio::ip::tcp::endpoint end(addr, host.port_number());
@@ -207,6 +215,12 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
                       const boost::system::error_code& ec,
                       const Resolver::results_type& endpointList)
     {
+        if (isShuttingDown)
+        {
+            BMCWEB_LOG_DEBUG("Connection shutting down, skipping afterResolve");
+            return;
+        }
+        
         if (ec || (endpointList.empty()))
         {
             BMCWEB_LOG_ERROR("Resolve failed: {} {}", ec.message(), host);
@@ -236,10 +250,18 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         // this branch
         if (ec && ec == boost::asio::error::operation_aborted)
         {
+            BMCWEB_LOG_DEBUG("Connect operation aborted for id: {}", connId);
             return;
         }
 
         timer.cancel();
+        
+        if (isShuttingDown)
+        {
+            BMCWEB_LOG_DEBUG("Connection shutting down, skipping afterConnect");
+            return;
+        }
+        
         if (ec)
         {
             BMCWEB_LOG_ERROR("Connect {}:{}, id: {} failed: {}",
@@ -291,10 +313,18 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         // this branch
         if (ec && ec == boost::asio::error::operation_aborted)
         {
+            BMCWEB_LOG_DEBUG("SSL handshake operation aborted for id: {}", connId);
             return;
         }
 
         timer.cancel();
+        
+        if (isShuttingDown)
+        {
+            BMCWEB_LOG_DEBUG("Connection shutting down, skipping afterSslHandshake");
+            return;
+        }
+        
         if (ec)
         {
             BMCWEB_LOG_ERROR("SSL Handshake failed - id: {} error: {}", connId,
@@ -344,10 +374,18 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         // this branch
         if (ec && ec == boost::asio::error::operation_aborted)
         {
+            BMCWEB_LOG_DEBUG("Write operation aborted for id: {}", connId);
             return;
         }
 
         timer.cancel();
+        
+        if (isShuttingDown)
+        {
+            BMCWEB_LOG_DEBUG("Connection shutting down, skipping afterWrite");
+            return;
+        }
+        
         if (ec)
         {
             BMCWEB_LOG_ERROR("sendMessage() failed: {} {}", ec.message(), host);
@@ -402,10 +440,18 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         // this branch
         if (ec && ec == boost::asio::error::operation_aborted)
         {
+            BMCWEB_LOG_DEBUG("Read operation aborted for id: {}", connId);
             return;
         }
 
         timer.cancel();
+        
+        if (isShuttingDown)
+        {
+            BMCWEB_LOG_DEBUG("Connection shutting down, skipping afterRead");
+            return;
+        }
+        
         if (ec && ec != boost::asio::ssl::error::stream_truncated)
         {
             BMCWEB_LOG_ERROR("recvMessage() failed: {} from {}", ec.message(),
