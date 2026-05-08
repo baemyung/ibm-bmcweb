@@ -73,36 +73,9 @@ class Server
         return dateStr;
     }
 
-    void updateDateStr()
-    {
-        time_t lastTimeT = time(nullptr);
-        tm myTm{};
-
-        gmtime_r(&lastTimeT, &myTm);
-
-        dateStr.resize(100);
-        size_t dateStrSz = strftime(dateStr.data(), dateStr.size() - 1,
-                                    "%a, %d %b %Y %H:%M:%S GMT", &myTm);
-        dateStr.resize(dateStrSz);
-    }
-
     void run()
     {
         loadCertificate();
-        updateDateStr();
-
-        getCachedDateStr = [this]() -> std::string {
-            static std::chrono::time_point<std::chrono::steady_clock>
-                lastDateUpdate = std::chrono::steady_clock::now();
-            if (std::chrono::steady_clock::now() - lastDateUpdate >=
-                std::chrono::seconds(10))
-            {
-                lastDateUpdate = std::chrono::steady_clock::now();
-                updateDateStr();
-            }
-            return dateStr;
-        };
-
         for (const Acceptor& accept : acceptors)
         {
             BMCWEB_LOG_INFO(
@@ -215,6 +188,7 @@ class Server
     boost::asio::signal_set signals;
 
     std::string dateStr;
+    std::chrono::steady_clock::time_point lastDateUpdate;
 
     Handler* handler;
 

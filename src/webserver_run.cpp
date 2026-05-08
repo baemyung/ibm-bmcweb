@@ -24,6 +24,7 @@
 #include "persistent_data.hpp"
 #include "redfish.hpp"
 #include "redfish_aggregator.hpp"
+#include "ssl_context_factory_sni.hpp"
 #include "user_monitor.hpp"
 #include "vm_websocket.hpp"
 #include "watchdog.hpp"
@@ -70,7 +71,6 @@ int run()
     iface->register_method("SetLogLevel", setLogLevel);
 
     iface->initialize();
-
     // Load the peristent data
     persistent_data::getConfig();
 
@@ -166,8 +166,13 @@ int run()
     bmcweb::registerUserRemovedSignal();
 
     bmcweb::ServiceWatchdog watchdog;
-
-    app.run();
+    bmcweb::SniContextFactoryState state(
+        [](const std::string& sniname) {
+            return sniname.starts_with("9.6.28.10");
+        },
+        "/etc/ssl/certs/https/server_cert.pem",
+        "/etc/ssl/private/server_pkey.pem", "/etc/ssl/certs/authority");
+    app.run(state);
 
     systemBus->request_name("xyz.openbmc_project.bmcweb");
 
