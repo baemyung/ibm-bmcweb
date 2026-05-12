@@ -2306,7 +2306,8 @@ inline void getChapData(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
 /*
  * Set ChapData
  */
-inline void setChapData(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
+inline void setChapData(const crow::Request& req,
+                        const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
                         std::optional<std::string> chapName,
                         std::optional<std::string> chapSecret)
 {
@@ -2328,6 +2329,7 @@ inline void setChapData(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
 
     if (chapSecret)
     {
+        req.setSkipAuditDetail(true);
         sdbusplus::asio::setProperty(
             *crow::connections::systemBus, "xyz.openbmc_project.PLDM",
             "/xyz/openbmc_project/pldm", "com.ibm.PLDM.ChapData", "ChapSecret",
@@ -3056,7 +3058,7 @@ inline void handleComputerSystemPatch(
 
     if (chapName || chapSecret)
     {
-        setChapData(asyncResp, chapName, chapSecret);
+        setChapData(req, asyncResp, chapName, chapSecret);
     }
 
     if (pcieTopologyRefresh)

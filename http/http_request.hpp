@@ -81,6 +81,17 @@ struct Request : std::enable_shared_from_this<Request>
         ipAddress = boost::asio::ip::address();
         session = nullptr;
         userRole = "";
+        skipAuditDetailFlag = false;
+    }
+
+    void setSkipAuditDetail(bool skip) const
+    {
+        skipAuditDetailFlag = skip;
+    }
+
+    bool skipAuditDetail() const
+    {
+        return skipAuditDetailFlag;
     }
 
     void clearBody()
@@ -171,6 +182,8 @@ struct Request : std::enable_shared_from_this<Request>
     }
 
   private:
+    mutable bool skipAuditDetailFlag = false;
+
     bool setUrlInfo()
     {
         auto result = boost::urls::parse_relative_ref(target());

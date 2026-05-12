@@ -117,11 +117,14 @@ void auditSetState(bool enable)
  */
 inline bool checkSkipDetail(const crow::Request& req)
 {
-    return req.target().starts_with("/redfish/v1/AccountService/Accounts") ||
+    return req.target().starts_with("/redfish/v1/AccountService") ||
+           req.target().starts_with("/redfish/v1/CertificateService") ||
+           req.target().starts_with("/redfish/v1/EventService/Subscriptions") ||
+           req.target().starts_with("/redfish/v1/LicenseService/Licenses") ||
            req.target().starts_with("/redfish/v1/UpdateService") ||
            req.target().starts_with("/ibm/v1") ||
            ((req.method() == boost::beast::http::verb::post) &&
-            (checkPostUser(req) ||
+            (checkPostUser(req) || req.target().contains("Certificates") ||
              req.target().contains("LogService.CollectDiagnosticData")));
 }
 
@@ -132,6 +135,13 @@ inline bool checkSkipDetail(const crow::Request& req)
  */
 bool wantDetail(const crow::Request& req)
 {
+    // Request is specially marked
+    if (req.skipAuditDetail())
+    {
+        return false;
+    }
+
+    // Check for known Redfish routes to skip detail
     switch (req.method())
     {
         case boost::beast::http::verb::patch:
