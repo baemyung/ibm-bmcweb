@@ -702,7 +702,22 @@ class ConnectionPool : public std::enable_shared_from_this<ConnectionPool>
     // Otherwise closes the connection if it is not a keep-alive
     void sendNext(bool keepAlive, uint32_t connId)
     {
+        // Band-aid fix: Add bounds checking to prevent out-of-bounds access
+        if (connId >= connections.size())
+        {
+            BMCWEB_LOG_ERROR("Invalid connId: {} (size: {})", connId,
+                             connections.size());
+            return;
+        }
+
         auto conn = connections[connId];
+
+        // Band-aid fix: Add null pointer validation
+        if (!conn)
+        {
+            BMCWEB_LOG_ERROR("Connection at index {} is null", connId);
+            return;
+        }
 
         // Allow the connection's handler to be deleted
         // This is needed because of Redfish Aggregation passing an
@@ -819,12 +834,8 @@ class ConnectionPool : public std::enable_shared_from_this<ConnectionPool>
                               const std::function<void(Response&)>& resHandler,
                               bool keepAlive, uint32_t connId, Response& res)
     {
-        // Allow provided callback to perform additional processing of the
-        // request
-        resHandler(res);
-
-        // If requests remain in the queue then we want to reuse this
-        // connection to send the next request
+        // Band-aid fix: Check if pool still exists BEFORE calling user callback
+        // This prevents calling the callback if the ConnectionPool has been destroyed
         std::shared_ptr<ConnectionPool> self = weakSelf.lock();
         if (!self)
         {
@@ -833,6 +844,12 @@ class ConnectionPool : public std::enable_shared_from_this<ConnectionPool>
             return;
         }
 
+        // Allow provided callback to perform additional processing of the
+        // request
+        resHandler(res);
+
+        // If requests remain in the queue then we want to reuse this
+        // connection to send the next request
         self->sendNext(keepAlive, connId);
     }
 
