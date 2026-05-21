@@ -462,4 +462,15 @@ executable(
     install_dir: bindir,
 )
 
+# Generate the aggressive HTTP client crash test
+executable(
+    'http-client-aggressive-test',
+    'src/http_client_aggressive_test.cpp',
+    include_directories: incdir,
+    dependencies: bmcweb_dependencies,
+    link_with: bmcweblib,
+    install: true,
+    install_dir: bindir,
+)
+
 subdir('test')
