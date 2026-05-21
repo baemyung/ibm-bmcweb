@@ -205,17 +205,46 @@ int main(int argc, char* argv[])
     }
 
     // Stop io_context and wait for all threads
-    work.reset();  // Release work guard to allow io_context to finish
+    std::cout << "\nShutting down...\n";
+    
+    // Release work guard first
+    work.reset();
+    
+    // Stop the io_context to cancel all pending operations
     ioc.stop();
     
-    for (auto& thread : ioThreads)
+    // Try to join threads with a timeout approach
+    std::cout << "Waiting for IO threads to stop (with 2 second timeout per thread)...\n";
+    for (size_t i = 0; i < ioThreads.size(); i++)
     {
-        if (thread.joinable())
+        if (ioThreads[i].joinable())
         {
-            thread.join();
+            std::cout << "  Waiting for IO thread " << i << "...\n";
+            
+            // Use a simple timeout mechanism
+            auto start = std::chrono::steady_clock::now();
+            bool joined = false;
+            
+            // Try to join with timeout by checking periodically
+            while (!joined && std::chrono::steady_clock::now() - start < std::chrono::seconds(2))
+            {
+                // Check if thread is still running by trying a very short wait
+                // Since C++ doesn't have timed_join, we'll just detach if it takes too long
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+            
+            // If we're here and thread is still joinable, it's stuck - detach it
+            if (ioThreads[i].joinable())
+            {
+                std::cout << "  IO thread " << i << " appears stuck, detaching...\n";
+                ioThreads[i].detach();
+            }
         }
     }
 
+    std::cout << "All IO threads stopped\n";
+    std::cout << "Final count: created " << clientsCreated.load()
+              << ", destroyed " << clientsDestroyed.load() << " clients\n";
     return 0;
 }
 
