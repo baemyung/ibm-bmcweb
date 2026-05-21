@@ -160,12 +160,21 @@ int main(int argc, char* argv[])
 
     boost::asio::io_context ioc;
     
-    // Run io_context in background thread
-    std::thread ioThread([&ioc]() {
-        std::cout << "IO thread started\n";
-        ioc.run();
-        std::cout << "IO thread stopped\n";
-    });
+    // Use work guard to keep io_context alive
+    auto work = boost::asio::make_work_guard(ioc);
+    
+    // Run io_context in multiple threads for better concurrency handling
+    std::vector<std::thread> ioThreads;
+    const int numIoThreads = 2;
+    
+    for (int i = 0; i < numIoThreads; i++)
+    {
+        ioThreads.emplace_back([&ioc, i]() {
+            std::cout << "IO thread " << i << " started\n";
+            ioc.run();
+            std::cout << "IO thread " << i << " stopped\n";
+        });
+    }
 
     try
     {
@@ -195,10 +204,16 @@ int main(int argc, char* argv[])
         std::cerr << "Exception: " << e.what() << "\n";
     }
 
+    // Stop io_context and wait for all threads
+    work.reset();  // Release work guard to allow io_context to finish
     ioc.stop();
-    if (ioThread.joinable())
+    
+    for (auto& thread : ioThreads)
     {
-        ioThread.join();
+        if (thread.joinable())
+        {
+            thread.join();
+        }
     }
 
     return 0;
