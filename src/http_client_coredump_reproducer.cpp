@@ -45,7 +45,7 @@ void testRapidDestruction(boost::asio::io_context& ioc, int iterations)
     std::cout << std::string(70, '=') << "\n";
 
     auto policy = std::make_shared<crow::ConnectionPolicy>();
-    policy->maxRetryAttempts = 3;
+    policy->maxRetryAttempts = 0;  // Fail immediately, no retries
     policy->maxConnections = 4;
 
     int successfulCreations = 0;
@@ -73,11 +73,14 @@ void testRapidDestruction(boost::asio::io_context& ioc, int iterations)
                       << "\n";
         }
 
-        // Destroy immediately to trigger race condition
+        // Give async operations a moment to start
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
+        
+        // Destroy while async operations are pending
         client.reset();
 
         // Brief pause between iterations
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        std::this_thread::sleep_for(std::chrono::microseconds(500));
 
         if ((i + 1) % 10 == 0)
         {
@@ -99,7 +102,7 @@ void testConcurrentClients(boost::asio::io_context& ioc, int numClients)
     std::cout << std::string(70, '=') << "\n";
 
     auto policy = std::make_shared<crow::ConnectionPolicy>();
-    policy->maxRetryAttempts = 3;
+    policy->maxRetryAttempts = 0;  // Fail immediately, no retries
     policy->maxConnections = 4;
 
     std::vector<std::unique_ptr<crow::HttpClient>> clients;
@@ -145,7 +148,7 @@ void testDestructionDuringTimeout(boost::asio::io_context& ioc)
     std::cout << std::string(70, '=') << "\n";
 
     auto shortTimeoutPolicy = std::make_shared<crow::ConnectionPolicy>();
-    shortTimeoutPolicy->maxRetryAttempts = 1;
+    shortTimeoutPolicy->maxRetryAttempts = 0;  // Fail immediately
 
     auto client = std::make_unique<crow::HttpClient>(ioc, shortTimeoutPolicy);
 
@@ -180,7 +183,7 @@ void testStressTest(boost::asio::io_context& ioc, int iterations)
     std::cout << std::string(70, '=') << "\n";
 
     auto policy = std::make_shared<crow::ConnectionPolicy>();
-    policy->maxRetryAttempts = 3;
+    policy->maxRetryAttempts = 0;  // Fail immediately, no retries
     policy->maxConnections = 4;
 
     int completedIterations = 0;
