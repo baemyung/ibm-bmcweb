@@ -73,10 +73,11 @@ void testRapidDestruction(boost::asio::io_context& ioc, int iterations)
                       << "\n";
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // Destroy immediately to trigger race condition
         client.reset();
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        // Brief pause between iterations
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         if ((i + 1) % 10 == 0)
         {
@@ -130,9 +131,8 @@ void testConcurrentClients(boost::asio::io_context& ioc, int numClients)
         }
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
-    std::cout << "  Destroying all " << clients.size() << " clients...\n";
+    // Destroy immediately after all sends to trigger race condition
+    std::cout << "  Destroying all " << clients.size() << " clients immediately...\n";
     clients.clear();
 
     std::cout << "✓ Test 2 complete\n";
@@ -164,12 +164,11 @@ void testDestructionDuringTimeout(boost::asio::io_context& ioc)
         std::cout << "  Send failed: " << e.what() << "\n";
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(90));
-
-    std::cout << "  Destroying client near timeout...\n";
+    // Destroy immediately to trigger race condition
+    std::cout << "  Destroying client immediately...\n";
     client.reset();
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     std::cout << "✓ Test 3 complete\n";
 }
@@ -209,7 +208,7 @@ void testStressTest(boost::asio::io_context& ioc, int iterations)
             // Expected failures
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        // Destroy immediately to maximize race condition
         client.reset();
 
         completedIterations++;
