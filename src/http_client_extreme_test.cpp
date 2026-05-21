@@ -48,7 +48,7 @@ void extremeTest(boost::asio::io_context& ioc, int iterations)
 
     auto policy = std::make_shared<crow::ConnectionPolicy>();
     policy->maxRetryAttempts = 5;  // More retries = more callbacks
-    policy->retryIntervalSecs = std::chrono::milliseconds(10);  // Very short retry interval
+    policy->retryIntervalSecs = std::chrono::seconds(1);  // Short retry interval
     policy->maxConnections = 8;  // More connections = more async operations
 
     for (int i = 0; i < iterations; i++)
@@ -85,8 +85,8 @@ void extremeTest(boost::asio::io_context& ioc, int iterations)
         {
             boost::asio::post(ioc, []() {
                 // Busy work to increase contention
-                volatile int x = 0;
-                for (int m = 0; m < 100; m++) { x++; }
+                int x = 0;
+                for (int m = 0; m < 100; m++) { x = x + 1; }
             });
         }
 
@@ -130,7 +130,7 @@ void chaosTest(boost::asio::io_context& ioc, int numThreads, int iterationsPerTh
 
             auto policy = std::make_shared<crow::ConnectionPolicy>();
             policy->maxRetryAttempts = 5;
-            policy->retryIntervalSecs = std::chrono::milliseconds(5);
+            policy->retryIntervalSecs = std::chrono::seconds(1);
             policy->maxConnections = 6;
 
             for (int i = 0; i < iterationsPerThread; i++)
