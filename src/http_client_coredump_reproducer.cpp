@@ -3,6 +3,7 @@
 // Can be installed and run directly on BMC
 
 #include "http/http_client.hpp"
+#include "ssl_key_handler.hpp"
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/steady_timer.hpp>
@@ -45,15 +46,13 @@ void testRapidDestruction(boost::asio::io_context& ioc, int iterations)
 
     auto policy = std::make_shared<crow::ConnectionPolicy>();
     policy->maxRetryAttempts = 3;
-    policy->requestTimeoutMs = 5000;
     policy->maxConnections = 4;
 
     int successfulCreations = 0;
 
     for (int i = 0; i < iterations; i++)
     {
-        auto client = std::make_unique<crow::HttpClient>(
-            ioc, "test-client-" + std::to_string(i), policy);
+        auto client = std::make_unique<crow::HttpClient>(ioc, policy);
 
         boost::beast::http::fields headers;
         headers.set(boost::beast::http::field::host, "192.0.2.1");
@@ -63,11 +62,8 @@ void testRapidDestruction(boost::asio::io_context& ioc, int iterations)
             client->sendData(
                 "test data " + std::to_string(i),
                 boost::urls::url_view("http://192.0.2.1:8080/test"),
-                crow::ensuressl::VerifyCertificate::VerifyNone, headers,
-                boost::beast::http::verb::post,
-                [i](const crow::Response& /*res*/) {
-                // Callback - may execute after client is destroyed
-            });
+                ensuressl::VerifyCertificate::NoVerify, headers,
+                boost::beast::http::verb::post);
 
             successfulCreations++;
         }
@@ -103,15 +99,13 @@ void testConcurrentClients(boost::asio::io_context& ioc, int numClients)
 
     auto policy = std::make_shared<crow::ConnectionPolicy>();
     policy->maxRetryAttempts = 3;
-    policy->requestTimeoutMs = 5000;
     policy->maxConnections = 4;
 
     std::vector<std::unique_ptr<crow::HttpClient>> clients;
 
     for (int i = 0; i < numClients; i++)
     {
-        clients.push_back(std::make_unique<crow::HttpClient>(
-            ioc, "concurrent-client-" + std::to_string(i), policy));
+        clients.push_back(std::make_unique<crow::HttpClient>(ioc, policy));
     }
 
     for (size_t i = 0; i < clients.size(); i++)
@@ -126,11 +120,8 @@ void testConcurrentClients(boost::asio::io_context& ioc, int numClients)
                 "concurrent test " + std::to_string(i),
                 boost::urls::url_view("http://192.0.2." +
                                       std::to_string(i + 1) + ":8080/test"),
-                crow::ensuressl::VerifyCertificate::VerifyNone, headers,
-                boost::beast::http::verb::post,
-                [i](const crow::Response& /*res*/) {
-                // Callback
-            });
+                ensuressl::VerifyCertificate::NoVerify, headers,
+                boost::beast::http::verb::post);
         }
         catch (const std::exception& e)
         {
@@ -154,11 +145,9 @@ void testDestructionDuringTimeout(boost::asio::io_context& ioc)
     std::cout << std::string(70, '=') << "\n";
 
     auto shortTimeoutPolicy = std::make_shared<crow::ConnectionPolicy>();
-    shortTimeoutPolicy->requestTimeoutMs = 100;
     shortTimeoutPolicy->maxRetryAttempts = 1;
 
-    auto client = std::make_unique<crow::HttpClient>(ioc, "timeout-test-client",
-                                                      shortTimeoutPolicy);
+    auto client = std::make_unique<crow::HttpClient>(ioc, shortTimeoutPolicy);
 
     boost::beast::http::fields headers;
     headers.set(boost::beast::http::field::host, "192.0.2.1");
@@ -167,10 +156,8 @@ void testDestructionDuringTimeout(boost::asio::io_context& ioc)
     {
         client->sendData(
             "timeout test", boost::urls::url_view("http://192.0.2.1:8080/test"),
-            crow::ensuressl::VerifyCertificate::VerifyNone, headers,
-            boost::beast::http::verb::post, [](const crow::Response& /*res*/) {
-            // Callback
-        });
+            ensuressl::VerifyCertificate::NoVerify, headers,
+            boost::beast::http::verb::post);
     }
     catch (const std::exception& e)
     {
@@ -195,15 +182,13 @@ void testStressTest(boost::asio::io_context& ioc, int iterations)
 
     auto policy = std::make_shared<crow::ConnectionPolicy>();
     policy->maxRetryAttempts = 3;
-    policy->requestTimeoutMs = 5000;
     policy->maxConnections = 4;
 
     int completedIterations = 0;
 
     for (int i = 0; i < iterations; i++)
     {
-        auto client = std::make_unique<crow::HttpClient>(
-            ioc, "stress-client-" + std::to_string(i), policy);
+        auto client = std::make_unique<crow::HttpClient>(ioc, policy);
 
         boost::beast::http::fields headers;
         headers.set(boost::beast::http::field::host,
@@ -216,11 +201,8 @@ void testStressTest(boost::asio::io_context& ioc, int iterations)
                 boost::urls::url_view("http://192.0.2." +
                                       std::to_string((i % 254) + 1) +
                                       ":8080/test"),
-                crow::ensuressl::VerifyCertificate::VerifyNone, headers,
-                boost::beast::http::verb::post,
-                [i](const crow::Response& /*res*/) {
-                // Callback
-            });
+                ensuressl::VerifyCertificate::NoVerify, headers,
+                boost::beast::http::verb::post);
         }
         catch (const std::exception& e)
         {
