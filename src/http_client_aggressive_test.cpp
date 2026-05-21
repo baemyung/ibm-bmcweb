@@ -206,8 +206,17 @@ int main(int argc, char* argv[])
 
     // Stop io_context and wait for all threads
     work.reset();  // Release work guard to allow io_context to finish
+    
+    // Post a no-op to wake up all threads, then stop
+    boost::asio::post(ioc, []() {});
+    
+    // Give threads a moment to finish pending work
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
+    // Stop all threads
     ioc.stop();
     
+    // Join all io_context threads
     for (auto& thread : ioThreads)
     {
         if (thread.joinable())
@@ -216,6 +225,7 @@ int main(int argc, char* argv[])
         }
     }
 
+    std::cout << "All IO threads stopped\n";
     return 0;
 }
 
