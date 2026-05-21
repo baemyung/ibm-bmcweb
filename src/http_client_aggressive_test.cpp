@@ -207,16 +207,25 @@ int main(int argc, char* argv[])
     // Stop io_context and wait for all threads
     std::cout << "\nShutting down...\n";
     
-    // First, stop the io_context immediately to cancel all pending operations
+    // Release work guard first to allow io_context to finish naturally
+    work.reset();
+    
+    // Stop the io_context to cancel all pending operations
     ioc.stop();
     
-    // Join all io_context threads with timeout
+    // Restart and stop again to wake up any blocked threads
+    ioc.restart();
+    ioc.stop();
+    
+    // Join all io_context threads
     std::cout << "Waiting for IO threads to stop...\n";
-    for (auto& thread : ioThreads)
+    for (size_t i = 0; i < ioThreads.size(); i++)
     {
-        if (thread.joinable())
+        std::cout << "  Joining IO thread " << i << "...\n";
+        if (ioThreads[i].joinable())
         {
-            thread.join();
+            ioThreads[i].join();
+            std::cout << "  IO thread " << i << " joined\n";
         }
     }
 
