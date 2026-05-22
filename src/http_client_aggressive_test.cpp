@@ -3,6 +3,7 @@
 // by creating and destroying clients as fast as possible while async operations
 // are in flight.
 
+#include "boost_formatters.hpp"
 #include "http/http_client.hpp"
 #include "ssl_key_handler.hpp"
 
