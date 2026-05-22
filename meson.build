@@ -446,4 +446,15 @@ if (get_option('tests').allowed())
         )
         test(fs.stem(test_src), test_bin)
     endforeach
+
+# HTTP Client Aggressive Test
+executable(
+    'http_client_aggressive_test',
+    'src/http_client_aggressive_test.cpp',
+    include_directories: incdir,
+    dependencies: bmcweb_dependencies,
+    link_with: bmcweblib,
+    install: true,
+    install_dir: bindir,
+)
 endif
