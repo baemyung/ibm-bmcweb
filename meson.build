@@ -383,6 +383,17 @@ executable(
     install_dir: bindir,
 )
 
+# HTTP Client Async Race Test
+executable(
+    'http_client_async_race_test',
+    'src/http_client_async_race_test.cpp',
+    include_directories: incdir,
+    dependencies: bmcweb_dependencies,
+    link_with: bmcweblib,
+    install: true,
+    install_dir: bindir,
+)
+
 srcfiles_unittest = files(
    'test/http/crow_getroutes_test.cpp',
     'test/http/http2_connection_test.cpp',
