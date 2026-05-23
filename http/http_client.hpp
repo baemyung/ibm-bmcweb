@@ -683,11 +683,14 @@ class ConnectionPool : public std::enable_shared_from_this<ConnectionPool>
     // Otherwise closes the connection if it is not a keep-alive
     void sendNext(bool keepAlive, uint32_t connId)
     {
+        BMCWEB_LOG_DEBUG("sendNext called for pool: {}, connId: {}, keepAlive: {}",
+                         id, connId, keepAlive);
+        
         // Check if pool is shutting down to prevent accessing destroyed state
         if (isShuttingDown.load(std::memory_order_acquire))
         {
-            BMCWEB_LOG_DEBUG(
-                "Pool {} is shutting down, ignoring sendNext for connection {}",
+            BMCWEB_LOG_CRITICAL(
+                "sendNext: Pool {} is shutting down, ignoring sendNext for connection {}",
                 id, connId);
             return;
         }
@@ -695,11 +698,12 @@ class ConnectionPool : public std::enable_shared_from_this<ConnectionPool>
         // Defensive check: Validate connId is within bounds
         if (connId >= connections.size())
         {
-            BMCWEB_LOG_ERROR("Invalid connId: {} (size: {})", connId,
+            BMCWEB_LOG_ERROR("sendNext: Invalid connId: {} (size: {})", connId,
                              connections.size());
             return;
         }
 
+        BMCWEB_LOG_DEBUG("sendNext: accessing connections[{}]", connId);
         auto conn = connections[connId];
 
         // Defensive check: Validate connection pointer is not null
@@ -835,22 +839,30 @@ class ConnectionPool : public std::enable_shared_from_this<ConnectionPool>
                               const std::function<void(Response&)>& resHandler,
                               bool keepAlive, uint32_t connId, Response& res)
     {
+        BMCWEB_LOG_DEBUG("afterSendData called for connId: {}", connId);
+        
         // Validate ConnectionPool still exists before executing callback
         // This prevents use-after-free if pool is destroyed during callback
         std::shared_ptr<ConnectionPool> self = weakSelf.lock();
         if (!self)
         {
-            BMCWEB_LOG_CRITICAL("Failed to capture connection");
+            BMCWEB_LOG_CRITICAL("afterSendData: weak_ptr lock FAILED - ConnectionPool destroyed");
             return;
         }
+
+        BMCWEB_LOG_DEBUG("afterSendData: weak_ptr lock SUCCEEDED for pool: {}", self->id);
 
         // Allow provided callback to perform additional processing of the
         // request (now safe after pool validation)
         resHandler(res);
 
+        BMCWEB_LOG_DEBUG("afterSendData: calling sendNext for connId: {}", connId);
+        
         // If requests remain in the queue then we want to reuse this
         // connection to send the next request
         self->sendNext(keepAlive, connId);
+        
+        BMCWEB_LOG_DEBUG("afterSendData: sendNext completed for connId: {}", connId);
     }
 
     std::shared_ptr<ConnectionInfo>& addConnection()
@@ -883,18 +895,22 @@ class ConnectionPool : public std::enable_shared_from_this<ConnectionPool>
 
     ~ConnectionPool()
     {
+        BMCWEB_LOG_CRITICAL("ConnectionPool {} destructor START (connections: {}, queue: {})",
+                            id, connections.size(), requestQueue.size());
+        
         // Set shutdown flag FIRST to prevent any new operations
         isShuttingDown.store(true, std::memory_order_release);
         
         // Ensure the flag write is visible before we start destroying anything
         std::atomic_thread_fence(std::memory_order_seq_cst);
         
-        BMCWEB_LOG_DEBUG("ConnectionPool {} destructor called, clearing {} connections",
-                         id, connections.size());
+        BMCWEB_LOG_DEBUG("ConnectionPool {} shutdown flag set, clearing connections", id);
         
         // Explicitly clear connections to ensure proper cleanup order
         connections.clear();
         requestQueue.clear();
+        
+        BMCWEB_LOG_CRITICAL("ConnectionPool {} destructor END", id);
     }
 
     // Check whether all connections are terminated
