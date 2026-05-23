@@ -755,6 +755,17 @@ class ConnectionPool : public std::enable_shared_from_this<ConnectionPool>
                   const boost::beast::http::verb verb,
                   const std::function<void(Response&)>& resHandler)
     {
+        // Check if pool is shutting down
+        if (isShuttingDown.load(std::memory_order_acquire))
+        {
+            BMCWEB_LOG_DEBUG("Pool {} is shutting down, rejecting new request",
+                             id);
+            Response dummyRes;
+            dummyRes.result(boost::beast::http::status::service_unavailable);
+            resHandler(dummyRes);
+            return;
+        }
+
         // Construct the request to be sent
         boost::beast::http::request<bmcweb::HttpBody> thisReq(
             verb, destUri.encoded_target(), 11, "", httpHeader);
@@ -872,14 +883,30 @@ class ConnectionPool : public std::enable_shared_from_this<ConnectionPool>
 
     ~ConnectionPool()
     {
-        // Set shutdown flag to prevent callbacks from accessing destroyed state
+        // Set shutdown flag FIRST to prevent any new operations
         isShuttingDown.store(true, std::memory_order_release);
-        BMCWEB_LOG_DEBUG("ConnectionPool {} destructor called", id);
+        
+        // Ensure the flag write is visible before we start destroying anything
+        std::atomic_thread_fence(std::memory_order_seq_cst);
+        
+        BMCWEB_LOG_DEBUG("ConnectionPool {} destructor called, clearing {} connections",
+                         id, connections.size());
+        
+        // Explicitly clear connections to ensure proper cleanup order
+        connections.clear();
+        requestQueue.clear();
     }
 
     // Check whether all connections are terminated
     bool areAllConnectionsTerminated()
     {
+        // If shutting down, consider all connections terminated
+        if (isShuttingDown.load(std::memory_order_acquire))
+        {
+            BMCWEB_LOG_DEBUG("Pool {} is shutting down, considering all connections terminated", id);
+            return true;
+        }
+
         if (connections.empty())
         {
             BMCWEB_LOG_DEBUG("There are no connections for pool id:{}", id);
