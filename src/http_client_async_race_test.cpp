@@ -1,301 +1,297 @@
-/*
- * HTTP Client Async Race Condition Test
- * 
- * This test simulates the actual async race condition in a single-threaded
- * environment (like bmcweb). The issue is NOT multi-threading, but rather
- * the order of async callback execution when objects are destroyed.
- */
+// HTTP Client Async Race Condition Test (Single-Threaded)
+// This test simulates the actual async race conditions in bmcweb's
+// single-threaded environment where objects are destroyed while
+// async operations are still pending in the io_context queue.
 
+#include "boost_formatters.hpp"
 #include "http/http_client.hpp"
-#include "logging.hpp"
+#include "ssl_key_handler.hpp"
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/steady_timer.hpp>
+#include <boost/beast/http/field.hpp>
+#include <boost/beast/http/verb.hpp>
+#include <boost/url/url_view.hpp>
 
+#include <atomic>
 #include <chrono>
 #include <iostream>
 #include <memory>
+#include <string>
+#include <thread>
 
 using namespace std::chrono_literals;
 
-// Simple HTTP server simulator that responds after a delay
-class MockServer
+std::atomic<int> clientsCreated{0};
+std::atomic<int> clientsDestroyed{0};
+std::atomic<int> requestsSent{0};
+
+// Test 1: Create client, send requests, destroy immediately
+// This simulates the most common race: destruction before async ops complete
+void testImmediateDestruction(boost::asio::io_context& ioc, int iterations)
 {
-  public:
-    explicit MockServer(boost::asio::io_context& ioc) : timer(ioc) {}
+    std::cout << "\n[TEST 1] Immediate Destruction After Send\n";
+    std::cout << std::string(70, '=') << "\n";
+    std::cout << "Creating clients, sending requests, destroying immediately\n";
+    std::cout << "This tests if callbacks handle destroyed ConnectionPool correctly\n\n";
 
-    void simulateResponse(std::function<void()> callback)
-    {
-        // Simulate network delay
-        timer.expires_after(10ms);
-        timer.async_wait([callback](const boost::system::error_code& ec) {
-            if (!ec)
-            {
-                callback();
-            }
-        });
-    }
-
-  private:
-    boost::asio::steady_timer timer;
-};
-
-// Test scenario: Create HttpClient, send request, destroy HttpClient
-// before response arrives
-void testAsyncRaceCondition()
-{
-    std::cout << "\n=== Test: Async Race Condition ===\n";
-    
-    boost::asio::io_context ioc;
-    
-    // Create connection policy
     auto policy = std::make_shared<crow::ConnectionPolicy>();
-    policy->maxRetryAttempts = 1;
+    policy->maxRetryAttempts = 2;
     policy->retryIntervalSecs = std::chrono::seconds(0);
-    
-    int iteration = 0;
-    int maxIterations = 1000;
-    
-    std::function<void()> runTest;
-    runTest = [&]() {
-        if (iteration >= maxIterations)
-        {
-            std::cout << "Test completed successfully after " << iteration 
-                      << " iterations\n";
-            return;
-        }
-        
-        iteration++;
-        if (iteration % 100 == 0)
-        {
-            std::cout << "Iteration " << iteration << "...\n";
-        }
-        
-        // Create HttpClient
-        auto client = std::make_unique<crow::HttpClient>(ioc, policy);
-        
-        // Send a request
-        boost::beast::http::fields headers;
-        headers.set(boost::beast::http::field::content_type, "application/json");
-        
-        try
-        {
-            client->sendData(
-                R"({"test": "data"})",
-                boost::urls::url_view("http://localhost:8080/test"),
-                crow::ensuressl::VerifyCertificate::NoVerify,
-                headers,
-                boost::beast::http::verb::post
-            );
-        }
-        catch (const std::exception& e)
-        {
-            std::cerr << "Exception in sendData: " << e.what() << "\n";
-        }
-        
-        // Immediately destroy the client (before response arrives)
-        // This simulates the race condition
-        client.reset();
-        
-        // Schedule next iteration
-        auto nextTimer = std::make_shared<boost::asio::steady_timer>(ioc);
-        nextTimer->expires_after(1ms);
-        nextTimer->async_wait([&runTest, nextTimer](const boost::system::error_code&) {
-            runTest();
-        });
-    };
-    
-    // Start the test
-    runTest();
-    
-    // Run the io_context
-    try
-    {
-        ioc.run();
-    }
-    catch (const std::exception& e)
-    {
-        std::cerr << "Exception in io_context: " << e.what() << "\n";
-        throw;
-    }
-}
+    policy->maxConnections = 3;
 
-// Test scenario: Multiple rapid create/destroy cycles
-void testRapidCreateDestroy()
-{
-    std::cout << "\n=== Test: Rapid Create/Destroy ===\n";
-    
-    boost::asio::io_context ioc;
-    auto policy = std::make_shared<crow::ConnectionPolicy>();
-    
-    int iteration = 0;
-    int maxIterations = 500;
-    
-    std::function<void()> runTest;
-    runTest = [&]() {
-        if (iteration >= maxIterations)
+    for (int i = 0; i < iterations; i++)
+    {
+        // Create client
+        auto client = std::make_unique<crow::HttpClient>(ioc, policy);
+        clientsCreated++;
+
+        boost::beast::http::fields headers;
+        headers.set(boost::beast::http::field::host, "192.0.2.1");
+
+        // Send multiple requests to unreachable IPs
+        // These will trigger async resolve operations
+        for (int j = 0; j < 3; j++)
         {
-            std::cout << "Test completed successfully after " << iteration 
-                      << " iterations\n";
-            return;
-        }
-        
-        iteration++;
-        if (iteration % 50 == 0)
-        {
-            std::cout << "Iteration " << iteration << "...\n";
-        }
-        
-        // Create multiple clients and destroy them immediately
-        for (int i = 0; i < 5; i++)
-        {
-            auto client = std::make_unique<crow::HttpClient>(ioc, policy);
-            
-            boost::beast::http::fields headers;
+            std::string ip = "192.0.2." + std::to_string((i * 3 + j) % 254 + 1);
             try
             {
                 client->sendData(
-                    R"({"test": "data"})",
-                    boost::urls::url_view("http://localhost:8080/test"),
-                    crow::ensuressl::VerifyCertificate::NoVerify,
+                    "test data",
+                    boost::urls::url_view("http://" + ip + ":8080/test"),
+                    ensuressl::VerifyCertificate::NoVerify,
                     headers,
-                    boost::beast::http::verb::post
-                );
+                    boost::beast::http::verb::post);
+                requestsSent++;
             }
             catch (const std::exception& e)
             {
-                // Ignore exceptions during shutdown
+                // Ignore exceptions
             }
-            
-            // Destroy immediately
-            client.reset();
         }
-        
-        // Schedule next iteration
-        auto nextTimer = std::make_shared<boost::asio::steady_timer>(ioc);
-        nextTimer->expires_after(5ms);
-        nextTimer->async_wait([&runTest, nextTimer](const boost::system::error_code&) {
-            runTest();
-        });
-    };
-    
-    runTest();
-    
-    try
-    {
-        ioc.run();
+
+        // Destroy immediately - async operations still pending
+        client.reset();
+        clientsDestroyed++;
+
+        if ((i + 1) % 100 == 0)
+        {
+            std::cout << "  Progress: " << (i + 1) << "/" << iterations
+                      << " (requests: " << requestsSent.load() << ")\n";
+        }
     }
-    catch (const std::exception& e)
-    {
-        std::cerr << "Exception in io_context: " << e.what() << "\n";
-        throw;
-    }
+
+    std::cout << "\n  Test complete: " << clientsCreated.load() << " clients, "
+              << requestsSent.load() << " requests\n";
 }
 
-// Test scenario: Destroy client while async operations are pending
-void testDestroyDuringAsyncOps()
+// Test 2: Destroy client while io_context is processing callbacks
+// This tests the actual async callback execution race
+void testDestroyDuringCallbackProcessing(boost::asio::io_context& ioc, int iterations)
 {
-    std::cout << "\n=== Test: Destroy During Async Operations ===\n";
-    
-    boost::asio::io_context ioc;
+    std::cout << "\n[TEST 2] Destroy During Callback Processing\n";
+    std::cout << std::string(70, '=') << "\n";
+    std::cout << "Destroying clients while io_context processes pending callbacks\n";
+    std::cout << "This tests if callbacks can handle mid-execution destruction\n\n";
+
     auto policy = std::make_shared<crow::ConnectionPolicy>();
-    
-    int iteration = 0;
-    int maxIterations = 200;
-    
-    std::function<void()> runTest;
-    runTest = [&]() {
-        if (iteration >= maxIterations)
-        {
-            std::cout << "Test completed successfully after " << iteration 
-                      << " iterations\n";
-            return;
-        }
-        
-        iteration++;
-        if (iteration % 20 == 0)
-        {
-            std::cout << "Iteration " << iteration << "...\n";
-        }
-        
+    policy->maxRetryAttempts = 1;
+    policy->retryIntervalSecs = std::chrono::seconds(0);
+    policy->maxConnections = 2;
+
+    int completed = 0;
+
+    for (int i = 0; i < iterations; i++)
+    {
         auto client = std::make_shared<crow::HttpClient>(ioc, policy);
-        
-        // Send multiple requests
+        clientsCreated++;
+
         boost::beast::http::fields headers;
-        for (int i = 0; i < 10; i++)
+        
+        // Send requests
+        for (int j = 0; j < 5; j++)
         {
+            std::string ip = "192.0.2." + std::to_string((i * 5 + j) % 254 + 1);
             try
             {
                 client->sendDataWithCallback(
-                    R"({"test": "data"})",
-                    boost::urls::url_view("http://localhost:8080/test"),
-                    crow::ensuressl::VerifyCertificate::NoVerify,
+                    "data",
+                    boost::urls::url_view("http://" + ip + ":8080/test"),
+                    ensuressl::VerifyCertificate::NoVerify,
                     headers,
                     boost::beast::http::verb::post,
-                    [](crow::Response& res) {
-                        // Response handler
-                        BMCWEB_LOG_DEBUG("Response received: {}", res.resultInt());
-                    }
-                );
+                    [](crow::Response&) {
+                        // Response callback - may never be called
+                    });
+                requestsSent++;
             }
-            catch (const std::exception& e)
-            {
-                // Ignore
-            }
+            catch (...) {}
         }
-        
-        // Destroy client while requests are pending
-        auto destroyTimer = std::make_shared<boost::asio::steady_timer>(ioc);
-        destroyTimer->expires_after(2ms);
-        destroyTimer->async_wait([client, destroyTimer](const boost::system::error_code&) mutable {
-            // Client will be destroyed here when shared_ptr goes out of scope
+
+        // Schedule destruction after a tiny delay
+        // This allows some async operations to start
+        auto timer = std::make_shared<boost::asio::steady_timer>(ioc);
+        timer->expires_after(1ms);
+        timer->async_wait([client, timer, &completed](const boost::system::error_code&) mutable {
+            // Client destroyed here when shared_ptr goes out of scope
             client.reset();
+            completed++;
         });
-        
-        // Schedule next iteration
-        auto nextTimer = std::make_shared<boost::asio::steady_timer>(ioc);
-        nextTimer->expires_after(10ms);
-        nextTimer->async_wait([&runTest, nextTimer](const boost::system::error_code&) {
-            runTest();
-        });
-    };
-    
-    runTest();
-    
-    try
-    {
-        ioc.run();
+
+        clientsDestroyed++;
+
+        if ((i + 1) % 50 == 0)
+        {
+            std::cout << "  Progress: " << (i + 1) << "/" << iterations
+                      << " (completed: " << completed << ")\n";
+        }
     }
-    catch (const std::exception& e)
-    {
-        std::cerr << "Exception in io_context: " << e.what() << "\n";
-        throw;
-    }
+
+    std::cout << "\n  Test complete: " << clientsCreated.load() << " clients, "
+              << requestsSent.load() << " requests\n";
 }
 
-int main()
+// Test 3: Rapid create/destroy cycles
+// This maximizes the chance of callbacks executing on destroyed objects
+void testRapidCycles(boost::asio::io_context& ioc, int cycles)
 {
-    std::cout << "HTTP Client Async Race Condition Test\n";
-    std::cout << "======================================\n";
-    std::cout << "This test simulates async race conditions in a single-threaded\n";
-    std::cout << "environment (like bmcweb) where objects are destroyed while\n";
-    std::cout << "async operations are still pending.\n";
+    std::cout << "\n[TEST 3] Rapid Create/Destroy Cycles\n";
+    std::cout << std::string(70, '=') << "\n";
+    std::cout << "Creating and destroying multiple clients in rapid succession\n";
+    std::cout << "This tests if the io_context queue handles destruction correctly\n\n";
+
+    auto policy = std::make_shared<crow::ConnectionPolicy>();
+    policy->maxRetryAttempts = 1;
+    policy->maxConnections = 2;
+
+    for (int cycle = 0; cycle < cycles; cycle++)
+    {
+        // Create multiple clients in one cycle
+        for (int i = 0; i < 5; i++)
+        {
+            auto client = std::make_unique<crow::HttpClient>(ioc, policy);
+            clientsCreated++;
+
+            boost::beast::http::fields headers;
+            
+            // Send a few requests
+            for (int j = 0; j < 2; j++)
+            {
+                std::string ip = "192.0.2." + std::to_string((cycle * 10 + i * 2 + j) % 254 + 1);
+                try
+                {
+                    client->sendData(
+                        "test",
+                        boost::urls::url_view("http://" + ip + ":8080/test"),
+                        ensuressl::VerifyCertificate::NoVerify,
+                        headers,
+                        boost::beast::http::verb::post);
+                    requestsSent++;
+                }
+                catch (...) {}
+            }
+
+            // Destroy immediately
+            client.reset();
+            clientsDestroyed++;
+        }
+
+        if ((cycle + 1) % 20 == 0)
+        {
+            std::cout << "  Cycle: " << (cycle + 1) << "/" << cycles
+                      << " (total requests: " << requestsSent.load() << ")\n";
+        }
+    }
+
+    std::cout << "\n  Test complete: " << clientsCreated.load() << " clients, "
+              << requestsSent.load() << " requests\n";
+}
+
+int main(int argc, char* argv[])
+{
+    int iterations = 500;
+
+    if (argc > 1)
+    {
+        iterations = std::stoi(argv[1]);
+    }
+
+    std::cout << "\n" << std::string(70, '=') << "\n";
+    std::cout << "HTTP Client Async Race Condition Test (Single-Threaded)\n";
+    std::cout << std::string(70, '=') << "\n";
+    std::cout << "This test simulates bmcweb's single-threaded async environment\n";
+    std::cout << "where objects are destroyed while async operations are pending.\n";
+    std::cout << "\nKey difference from aggressive test:\n";
+    std::cout << "  - Single io_context thread (like bmcweb)\n";
+    std::cout << "  - Tests async callback execution order\n";
+    std::cout << "  - Focuses on destruction timing, not concurrency\n";
+    std::cout << std::string(70, '=') << "\n";
+
+    boost::asio::io_context ioc;
     
+    // Use work guard to keep io_context alive during tests
+    auto work = boost::asio::make_work_guard(ioc);
+    
+    // Run io_context in a single thread (like bmcweb)
+    std::thread ioThread([&ioc]() {
+        std::cout << "\nIO thread started (single-threaded like bmcweb)\n";
+        ioc.run();
+        std::cout << "IO thread stopped\n";
+    });
+
     try
     {
-        testAsyncRaceCondition();
-        testRapidCreateDestroy();
-        testDestroyDuringAsyncOps();
+        // Give io_context time to start
+        std::this_thread::sleep_for(100ms);
+
+        // Run tests
+        testImmediateDestruction(ioc, iterations);
+        std::this_thread::sleep_for(500ms);
         
-        std::cout << "\n=== All Tests Passed ===\n";
-        return 0;
+        clientsCreated = 0;
+        clientsDestroyed = 0;
+        requestsSent = 0;
+        testDestroyDuringCallbackProcessing(ioc, iterations / 2);
+        std::this_thread::sleep_for(500ms);
+        
+        clientsCreated = 0;
+        clientsDestroyed = 0;
+        requestsSent = 0;
+        testRapidCycles(ioc, iterations / 5);
+        std::this_thread::sleep_for(500ms);
+
+        std::cout << "\n" << std::string(70, '=') << "\n";
+        std::cout << "All tests completed!\n";
+        std::cout << "\nIf no crash occurred:\n";
+        std::cout << "  1. The fix may be working correctly\n";
+        std::cout << "  2. The race condition is very timing-sensitive\n";
+        std::cout << "  3. Try running with AddressSanitizer:\n";
+        std::cout << "     meson configure -Db_sanitize=address && ninja\n";
+        std::cout << "\nIf crash occurred:\n";
+        std::cout << "  Check dmesg or journalctl for crash details\n";
+        std::cout << "  Run with gdb to get backtrace:\n";
+        std::cout << "     gdb ./http_client_async_race_test\n";
+        std::cout << std::string(70, '=') << "\n";
     }
     catch (const std::exception& e)
     {
-        std::cerr << "\n=== Test Failed ===\n";
-        std::cerr << "Exception: " << e.what() << "\n";
+        std::cerr << "\nException caught: " << e.what() << "\n";
+        work.reset();
+        if (ioThread.joinable())
+        {
+            ioThread.join();
+        }
         return 1;
     }
+
+    // Stop io_context and wait for thread
+    work.reset();
+    if (ioThread.joinable())
+    {
+        ioThread.join();
+    }
+
+    return 0;
 }
 
 // Made with Bob
