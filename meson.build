@@ -372,6 +372,17 @@ executable(
     install_dir: bindir,
 )
 
+# HTTP Client Aggressive Test
+executable(
+    'http_client_aggressive_test',
+    'src/http_client_aggressive_test.cpp',
+    include_directories: incdir,
+    dependencies: bmcweb_dependencies,
+    link_with: bmcweblib,
+    install: true,
+    install_dir: bindir,
+)
+
 srcfiles_unittest = files(
    'test/http/crow_getroutes_test.cpp',
     'test/http/http2_connection_test.cpp',
@@ -446,15 +457,5 @@ if (get_option('tests').allowed())
         )
         test(fs.stem(test_src), test_bin)
     endforeach
-
-# HTTP Client Aggressive Test
-executable(
-    'http_client_aggressive_test',
-    'src/http_client_aggressive_test.cpp',
-    include_directories: incdir,
-    dependencies: bmcweb_dependencies,
-    link_with: bmcweblib,
-    install: true,
-    install_dir: bindir,
-)
 endif
+

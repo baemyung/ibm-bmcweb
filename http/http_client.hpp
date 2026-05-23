@@ -42,6 +42,7 @@
 #include <boost/url/url.hpp>
 #include <boost/url/url_view_base.hpp>
 
+#include <atomic>
 #include <cstdlib>
 #include <functional>
 #include <memory>
@@ -651,6 +652,7 @@ class ConnectionPool : public std::enable_shared_from_this<ConnectionPool>
     std::vector<std::shared_ptr<ConnectionInfo>> connections;
     boost::container::devector<PendingRequest> requestQueue;
     ensuressl::VerifyCertificate verifyCert;
+    std::atomic<bool> isShuttingDown{false};
 
     friend class HttpClient;
 
@@ -681,6 +683,15 @@ class ConnectionPool : public std::enable_shared_from_this<ConnectionPool>
     // Otherwise closes the connection if it is not a keep-alive
     void sendNext(bool keepAlive, uint32_t connId)
     {
+        // Check if pool is shutting down to prevent accessing destroyed state
+        if (isShuttingDown.load(std::memory_order_acquire))
+        {
+            BMCWEB_LOG_DEBUG(
+                "Pool {} is shutting down, ignoring sendNext for connection {}",
+                id, connId);
+            return;
+        }
+
         // Defensive check: Validate connId is within bounds
         if (connId >= connections.size())
         {
@@ -857,6 +868,13 @@ class ConnectionPool : public std::enable_shared_from_this<ConnectionPool>
 
         // Initialize the pool with a single connection
         addConnection();
+    }
+
+    ~ConnectionPool()
+    {
+        // Set shutdown flag to prevent callbacks from accessing destroyed state
+        isShuttingDown.store(true, std::memory_order_release);
+        BMCWEB_LOG_DEBUG("ConnectionPool {} destructor called", id);
     }
 
     // Check whether all connections are terminated
