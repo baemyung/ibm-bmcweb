@@ -280,14 +280,14 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         {
             boost::beast::http::async_write(
                 *sslConn, req,
-                std::bind_front(&ConnectionInfo::afterWrite, this,
+                std::bind_front(&ConnectionInfo::afterWrite,
                                 shared_from_this()));
         }
         else
         {
             boost::beast::http::async_write(
                 conn, req,
-                std::bind_front(&ConnectionInfo::afterWrite, this,
+                std::bind_front(&ConnectionInfo::afterWrite,
                                 shared_from_this()));
         }
     }
@@ -473,7 +473,7 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         BMCWEB_LOG_DEBUG("Attempt retry after {} seconds. RetryCount = {}",
                          connPolicy->retryIntervalSecs.count(), retryCount);
         timer.expires_after(connPolicy->retryIntervalSecs);
-        timer.async_wait(std::bind_front(&ConnectionInfo::onTimerDone, this,
+        timer.async_wait(std::bind_front(&ConnectionInfo::onTimerDone,
                                          shared_from_this()));
     }
 
@@ -543,7 +543,7 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         }
 
         sslConn->async_shutdown(
-            std::bind_front(&ConnectionInfo::afterSslShutdown, this,
+            std::bind_front(&ConnectionInfo::afterSslShutdown,
                             shared_from_this(), retry));
     }
 
