@@ -203,8 +203,8 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         timer.expires_after(std::chrono::seconds(30));
         auto self = shared_from_this();
         auto weakSelf = weak_from_this();
-        timer.async_wait([weakSelf](const boost::system::error_code& ec) {
-            onTimeout(weakSelf, ec);
+        timer.async_wait([weakSelf](const boost::system::error_code& ec2) {
+            onTimeout(weakSelf, ec2);
         });
         boost::asio::async_connect(
             conn, endpointList,
@@ -257,8 +257,8 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         timer.expires_after(std::chrono::seconds(30));
         auto self = shared_from_this();
         auto weakSelf = weak_from_this();
-        timer.async_wait([weakSelf](const boost::system::error_code& ec) {
-            onTimeout(weakSelf, ec);
+        timer.async_wait([weakSelf](const boost::system::error_code& ec2) {
+            onTimeout(weakSelf, ec2);
         });
         sslConn->async_handshake(
             boost::asio::ssl::stream_base::client,
@@ -298,8 +298,8 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         // Set a timeout on the operation
         timer.expires_after(std::chrono::seconds(30));
         auto weakSelf = weak_from_this();
-        timer.async_wait([weakSelf](const boost::system::error_code& ec) {
-            onTimeout(weakSelf, ec);
+        timer.async_wait([weakSelf](const boost::system::error_code& ec2) {
+            onTimeout(weakSelf, ec2);
         });
         // Send the HTTP request to the remote host
         auto self = shared_from_this();
@@ -356,8 +356,8 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
 
         timer.expires_after(std::chrono::seconds(30));
         auto weakSelf = weak_from_this();
-        timer.async_wait([weakSelf](const boost::system::error_code& ec) {
-            onTimeout(weakSelf, ec);
+        timer.async_wait([weakSelf](const boost::system::error_code& ec2) {
+            onTimeout(weakSelf, ec2);
         });
 
         // Receive the HTTP response
