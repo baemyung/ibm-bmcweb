@@ -64,11 +64,16 @@ class Resolver
     void async_resolve(std::string_view host, std::string_view port,
                        ResolveHandler&& handler)
     {
-        BMCWEB_LOG_DEBUG("Trying to resolve: {}:{}", host, port);
+        // Convert string_views to strings immediately to avoid dangling references
+        // when the caller's temporary objects (like boost::urls::url members) are destroyed
+        std::string hostStr(host);
+        std::string portStr(port);
+        
+        BMCWEB_LOG_DEBUG("Trying to resolve: {}:{}", hostStr, portStr);
 
         uint16_t portNum = 0;
 
-        auto it = std::from_chars(&*port.begin(), &*port.end(), portNum);
+        auto it = std::from_chars(portStr.data(), portStr.data() + portStr.size(), portNum);
         if (it.ec != std::errc())
         {
             BMCWEB_LOG_ERROR("Failed to get the Port");
@@ -80,7 +85,7 @@ class Resolver
 
         uint64_t flag = 0;
         crow::connections::systemBus->async_method_call(
-            [host{std::string(host)}, portNum,
+            [hostStr, portNum,
              handler = std::forward<ResolveHandler>(handler)](
                 const boost::system::error_code& ec,
                 const std::vector<
@@ -116,7 +121,7 @@ class Resolver
                 handler(ec, endpointList);
             },
             "org.freedesktop.resolve1", "/org/freedesktop/resolve1",
-            "org.freedesktop.resolve1.Manager", "ResolveHostname", 0, host,
+            "org.freedesktop.resolve1.Manager", "ResolveHostname", 0, hostStr,
             AF_UNSPEC, flag);
     }
 };
