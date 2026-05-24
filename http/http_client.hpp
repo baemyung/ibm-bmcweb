@@ -167,7 +167,7 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
 
         resolver.async_resolve(host.encoded_host_address(), host.port(),
                                std::bind_front(&ConnectionInfo::afterResolve,
-                                               this, shared_from_this()));
+                                               shared_from_this()));
     }
 
     void afterResolve(const std::shared_ptr<ConnectionInfo>& /*self*/,
@@ -191,7 +191,7 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
 
         boost::asio::async_connect(
             conn, endpointList,
-            std::bind_front(&ConnectionInfo::afterConnect, this,
+            std::bind_front(&ConnectionInfo::afterConnect,
                             shared_from_this()));
     }
 
@@ -239,7 +239,7 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         timer.async_wait(std::bind_front(onTimeout, weak_from_this()));
         sslConn->async_handshake(
             boost::asio::ssl::stream_base::client,
-            std::bind_front(&ConnectionInfo::afterSslHandshake, this,
+            std::bind_front(&ConnectionInfo::afterSslHandshake,
                             shared_from_this()));
     }
 
@@ -332,14 +332,14 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         {
             boost::beast::http::async_read(
                 *sslConn, buffer, thisParser,
-                std::bind_front(&ConnectionInfo::afterRead, this,
+                std::bind_front(&ConnectionInfo::afterRead,
                                 shared_from_this()));
         }
         else
         {
             boost::beast::http::async_read(
                 conn, buffer, thisParser,
-                std::bind_front(&ConnectionInfo::afterRead, this,
+                std::bind_front(&ConnectionInfo::afterRead,
                                 shared_from_this()));
         }
     }

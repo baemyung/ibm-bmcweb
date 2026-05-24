@@ -447,3 +447,15 @@ if (get_option('tests').allowed())
         test(fs.stem(test_src), test_bin)
     endforeach
 endif
+
+# Test to reproduce pool destruction during callback
+executable(
+    'http-client-pool-destruction-test',
+    'src/http_client_pool_destruction_test.cpp',
+    include_directories: incdir,
+    dependencies: bmcweb_dependencies,
+    link_with: bmcweblib,
+    build_by_default: true,
+    install: true,
+    install_dir: bindir,
+)
