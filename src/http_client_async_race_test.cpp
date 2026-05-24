@@ -253,8 +253,16 @@ int main(int argc, char* argv[])
         auto deadline = std::chrono::steady_clock::now() + 3s;
         while (std::chrono::steady_clock::now() < deadline && !ioc.stopped())
         {
-            ioc.poll_one();
+            // poll() processes all ready handlers without blocking
+            // If no handlers are ready, it returns immediately
+            size_t handled = ioc.poll();
+            if (handled == 0)
+            {
+                // No handlers ready, sleep briefly to avoid busy-wait
+                std::this_thread::sleep_for(10ms);
+            }
         }
+        std::cout << "Timeout reached or io_context stopped\n";
         std::cout << "Stopping io_context and processing cancellations...\n";
         ioc.stop();
         // Process all cancellation handlers with safety limit
@@ -277,8 +285,13 @@ int main(int argc, char* argv[])
         deadline = std::chrono::steady_clock::now() + 3s;
         while (std::chrono::steady_clock::now() < deadline && !ioc.stopped())
         {
-            ioc.poll_one();
+            size_t handled = ioc.poll();
+            if (handled == 0)
+            {
+                std::this_thread::sleep_for(10ms);
+            }
         }
+        std::cout << "Timeout reached or io_context stopped\n";
         std::cout << "Stopping io_context and processing cancellations...\n";
         ioc.stop();
         // Process all cancellation handlers with safety limit
@@ -301,8 +314,13 @@ int main(int argc, char* argv[])
         deadline = std::chrono::steady_clock::now() + 3s;
         while (std::chrono::steady_clock::now() < deadline && !ioc.stopped())
         {
-            ioc.poll_one();
+            size_t handled = ioc.poll();
+            if (handled == 0)
+            {
+                std::this_thread::sleep_for(10ms);
+            }
         }
+        std::cout << "Timeout reached or io_context stopped\n";
         std::cout << "Stopping io_context and processing cancellations...\n";
         ioc.stop();
         // Process all cancellation handlers with safety limit
@@ -320,8 +338,13 @@ int main(int argc, char* argv[])
         deadline = std::chrono::steady_clock::now() + 5s;
         while (std::chrono::steady_clock::now() < deadline && !ioc.stopped())
         {
-            ioc.poll_one();
+            size_t handled = ioc.poll();
+            if (handled == 0)
+            {
+                std::this_thread::sleep_for(10ms);
+            }
         }
+        std::cout << "Final timeout reached or io_context stopped\n";
         
         // Stop any remaining operations and process cancellations
         std::cout << "Stopping io_context and processing final cancellations...\n";
