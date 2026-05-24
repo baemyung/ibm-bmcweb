@@ -64,25 +64,34 @@ class Resolver
     void async_resolve(std::string_view host, std::string_view port,
                        ResolveHandler&& handler)
     {
+        BMCWEB_LOG_DEBUG("[TRACE 1] async_resolve called with host.size()={}, port.size()={}",
+                         host.size(), port.size());
+        
         // Convert string_views to strings immediately to avoid dangling references
         // when the caller's temporary objects (like boost::urls::url members) are destroyed
         std::string hostStr(host);
-        std::string portStr(port);
+        BMCWEB_LOG_DEBUG("[TRACE 2] hostStr created: '{}'", hostStr);
         
-        BMCWEB_LOG_DEBUG("Trying to resolve: {}:{}", hostStr, portStr);
+        std::string portStr(port);
+        BMCWEB_LOG_DEBUG("[TRACE 3] portStr created: '{}'", portStr);
+        
+        BMCWEB_LOG_DEBUG("[TRACE 4] Trying to resolve: {}:{}", hostStr, portStr);
 
         uint16_t portNum = 0;
 
+        BMCWEB_LOG_DEBUG("[TRACE 5] About to parse port number");
         auto it = std::from_chars(portStr.data(), portStr.data() + portStr.size(), portNum);
+        BMCWEB_LOG_DEBUG("[TRACE 6] Port parsed: {}", portNum);
         if (it.ec != std::errc())
         {
-            BMCWEB_LOG_ERROR("Failed to get the Port");
+            BMCWEB_LOG_ERROR("[TRACE 7] Failed to get the Port");
             handler(std::make_error_code(std::errc::invalid_argument),
                     results_type{});
 
             return;
         }
 
+        BMCWEB_LOG_DEBUG("[TRACE 8] About to call systemBus->async_method_call");
         uint64_t flag = 0;
         crow::connections::systemBus->async_method_call(
             [hostStr, portNum,
@@ -91,14 +100,15 @@ class Resolver
                 const std::vector<
                     std::tuple<int32_t, int32_t, std::vector<uint8_t>>>& resp,
                 const std::string& hostName, const uint64_t flagNum) {
+                BMCWEB_LOG_DEBUG("[TRACE 9] D-Bus callback invoked, ec={}", ec.message());
                 results_type endpointList;
                 if (ec)
                 {
-                    BMCWEB_LOG_ERROR("Resolve failed: {}", ec.message());
+                    BMCWEB_LOG_ERROR("[TRACE 10] Resolve failed: {}", ec.message());
                     handler(ec, endpointList);
                     return;
                 }
-                BMCWEB_LOG_DEBUG("ResolveHostname returned: {}:{}", hostName,
+                BMCWEB_LOG_DEBUG("[TRACE 11] ResolveHostname returned: {}:{}", hostName,
                                  flagNum);
                 // Extract the IP address from the response
                 for (const std::tuple<int32_t, int32_t, std::vector<uint8_t>>&
@@ -123,6 +133,7 @@ class Resolver
             "org.freedesktop.resolve1", "/org/freedesktop/resolve1",
             "org.freedesktop.resolve1.Manager", "ResolveHostname", 0, hostStr,
             AF_UNSPEC, flag);
+        BMCWEB_LOG_DEBUG("[TRACE 12] async_method_call setup complete, returning from async_resolve");
     }
 };
 

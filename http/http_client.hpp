@@ -164,15 +164,24 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
     void doResolve()
     {
         state = ConnState::resolveInProgress;
-        BMCWEB_LOG_DEBUG("Trying to resolve: {}, id: {}", host, connId);
+        BMCWEB_LOG_DEBUG("[TRACE A] doResolve called for: {}, id: {}", host, connId);
+        
+        BMCWEB_LOG_DEBUG("[TRACE B] Getting host address and port");
+        auto hostAddr = host.encoded_host_address();
+        auto hostPort = host.port();
+        BMCWEB_LOG_DEBUG("[TRACE C] hostAddr type size: {}, hostPort type size: {}",
+                         sizeof(hostAddr), sizeof(hostPort));
 
         auto self = shared_from_this();
+        BMCWEB_LOG_DEBUG("[TRACE D] About to call resolver.async_resolve");
         resolver.async_resolve(
-            host.encoded_host_address(), host.port(),
+            hostAddr, hostPort,
             [self](const boost::system::error_code& ec,
                    const Resolver::results_type& endpointList) {
+                BMCWEB_LOG_DEBUG("[TRACE E] async_resolve callback invoked");
                 self->afterResolve(self, ec, endpointList);
             });
+        BMCWEB_LOG_DEBUG("[TRACE F] resolver.async_resolve call completed");
     }
 
     void afterResolve(const std::shared_ptr<ConnectionInfo>& /*self*/,
