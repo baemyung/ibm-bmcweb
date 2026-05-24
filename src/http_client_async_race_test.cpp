@@ -258,11 +258,13 @@ int main(int argc, char* argv[])
         std::cout << "Stopping io_context and processing cancellations...\n";
         ioc.stop();
         // Process all cancellation handlers with safety limit
-        int cancelCount = 0;
-        while (ioc.poll_one() > 0 && cancelCount < 1000) {
-            cancelCount++;
+        {
+            int cancelCount = 0;
+            while (ioc.poll_one() > 0 && cancelCount < 1000) {
+                cancelCount++;
+            }
+            std::cout << "Processed " << cancelCount << " cancellation handlers\n";
         }
-        std::cout << "Processed " << cancelCount << " cancellation handlers\n";
         ioc.restart();
         
         clientsCreated = 0;
@@ -280,11 +282,13 @@ int main(int argc, char* argv[])
         std::cout << "Stopping io_context and processing cancellations...\n";
         ioc.stop();
         // Process all cancellation handlers with safety limit
-        int cancelCount = 0;
-        while (ioc.poll_one() > 0 && cancelCount < 1000) {
-            cancelCount++;
+        {
+            int cancelCount = 0;
+            while (ioc.poll_one() > 0 && cancelCount < 1000) {
+                cancelCount++;
+            }
+            std::cout << "Processed " << cancelCount << " cancellation handlers\n";
         }
-        std::cout << "Processed " << cancelCount << " cancellation handlers\n";
         ioc.restart();
         
         clientsCreated = 0;
@@ -302,11 +306,13 @@ int main(int argc, char* argv[])
         std::cout << "Stopping io_context and processing cancellations...\n";
         ioc.stop();
         // Process all cancellation handlers with safety limit
-        int cancelCount = 0;
-        while (ioc.poll_one() > 0 && cancelCount < 1000) {
-            cancelCount++;
+        {
+            int cancelCount = 0;
+            while (ioc.poll_one() > 0 && cancelCount < 1000) {
+                cancelCount++;
+            }
+            std::cout << "Processed " << cancelCount << " cancellation handlers\n";
         }
-        std::cout << "Processed " << cancelCount << " cancellation handlers\n";
 
         // Final processing with timeout
         std::cout << "\nFinal processing (max 5 seconds)...\n";
@@ -320,11 +326,13 @@ int main(int argc, char* argv[])
         // Stop any remaining operations and process cancellations
         std::cout << "Stopping io_context and processing final cancellations...\n";
         ioc.stop();
-        cancelCount = 0;
-        while (ioc.poll_one() > 0 && cancelCount < 1000) {
-            cancelCount++;
+        {
+            int cancelCount = 0;
+            while (ioc.poll_one() > 0 && cancelCount < 1000) {
+                cancelCount++;
+            }
+            std::cout << "Processed " << cancelCount << " final cancellation handlers\n";
         }
-        std::cout << "Processed " << cancelCount << " final cancellation handlers\n";
         std::cout << "All operations cancelled and processed\n";
 
         std::cout << "\n" << std::string(70, '=') << "\n";
