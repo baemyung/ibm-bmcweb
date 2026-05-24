@@ -92,6 +92,19 @@ class Resolver
         }
 
         BMCWEB_LOG_DEBUG("[TRACE 8] About to call systemBus->async_method_call");
+        
+        // Check if systemBus is valid
+        if (crow::connections::systemBus == nullptr)
+        {
+            BMCWEB_LOG_ERROR("[TRACE 8.1] ERROR: systemBus is NULL!");
+            handler(std::make_error_code(std::errc::not_connected),
+                    results_type{});
+            return;
+        }
+        
+        BMCWEB_LOG_DEBUG("[TRACE 8.2] systemBus pointer is valid: {}",
+                         static_cast<void*>(crow::connections::systemBus));
+        
         uint64_t flag = 0;
         crow::connections::systemBus->async_method_call(
             [hostStr, portNum,
