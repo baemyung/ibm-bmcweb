@@ -201,9 +201,11 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         BMCWEB_LOG_DEBUG("Trying to connect to: {}, id: {}", host, connId);
 
         timer.expires_after(std::chrono::seconds(30));
-        timer.async_wait(std::bind_front(onTimeout, weak_from_this()));
-
         auto self = shared_from_this();
+        auto weakSelf = weak_from_this();
+        timer.async_wait([weakSelf](const boost::system::error_code& ec) {
+            onTimeout(weakSelf, ec);
+        });
         boost::asio::async_connect(
             conn, endpointList,
             [self](const boost::beast::error_code& ec2,
@@ -253,8 +255,11 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         }
         state = ConnState::handshakeInProgress;
         timer.expires_after(std::chrono::seconds(30));
-        timer.async_wait(std::bind_front(onTimeout, weak_from_this()));
         auto self = shared_from_this();
+        auto weakSelf = weak_from_this();
+        timer.async_wait([weakSelf](const boost::system::error_code& ec) {
+            onTimeout(weakSelf, ec);
+        });
         sslConn->async_handshake(
             boost::asio::ssl::stream_base::client,
             [self](const boost::beast::error_code& ec2) {
@@ -292,7 +297,10 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
 
         // Set a timeout on the operation
         timer.expires_after(std::chrono::seconds(30));
-        timer.async_wait(std::bind_front(onTimeout, weak_from_this()));
+        auto weakSelf = weak_from_this();
+        timer.async_wait([weakSelf](const boost::system::error_code& ec) {
+            onTimeout(weakSelf, ec);
+        });
         // Send the HTTP request to the remote host
         auto self = shared_from_this();
         if (sslConn)
@@ -347,7 +355,10 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         thisParser.body_limit(connPolicy->requestByteLimit);
 
         timer.expires_after(std::chrono::seconds(30));
-        timer.async_wait(std::bind_front(onTimeout, weak_from_this()));
+        auto weakSelf = weak_from_this();
+        timer.async_wait([weakSelf](const boost::system::error_code& ec) {
+            onTimeout(weakSelf, ec);
+        });
 
         // Receive the HTTP response
         auto self = shared_from_this();
