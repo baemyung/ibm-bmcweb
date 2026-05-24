@@ -255,6 +255,8 @@ int main(int argc, char* argv[])
         {
             ioc.poll_one();
         }
+        std::cout << "Stopping io_context to cancel pending operations...\n";
+        ioc.stop();
         ioc.restart();
         
         clientsCreated = 0;
@@ -269,6 +271,8 @@ int main(int argc, char* argv[])
         {
             ioc.poll_one();
         }
+        std::cout << "Stopping io_context to cancel pending operations...\n";
+        ioc.stop();
         ioc.restart();
         
         clientsCreated = 0;
@@ -283,9 +287,12 @@ int main(int argc, char* argv[])
         {
             ioc.poll_one();
         }
+        std::cout << "Stopping io_context to cancel pending operations...\n";
+        ioc.stop();
 
         // Final processing with timeout
         std::cout << "\nFinal processing (max 5 seconds)...\n";
+        ioc.restart();
         deadline = std::chrono::steady_clock::now() + 5s;
         while (std::chrono::steady_clock::now() < deadline && !ioc.stopped())
         {
