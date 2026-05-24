@@ -192,14 +192,17 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         BMCWEB_LOG_DEBUG("Trying to connect to: {}, id: {}", host, connId);
 
         timer.expires_after(std::chrono::seconds(30));
-        timer.async_wait(std::bind_front(onTimeout, weak_from_this()));
+        timer.async_wait([weak = weak_from_this()](
+                             const boost::system::error_code& ec) {
+            onTimeout(weak, ec);
+        });
 
         boost::asio::async_connect(
             conn, endpointList,
             [self = shared_from_this()](
-                const boost::beast::error_code& ec,
+                const boost::beast::error_code& ec2,
                 const boost::asio::ip::tcp::endpoint& endpoint) {
-            self->afterConnect(self, ec, endpoint);
+            self->afterConnect(self, ec2, endpoint);
         });
     }
 
@@ -342,22 +345,31 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         thisParser.body_limit(connPolicy->requestByteLimit);
 
         timer.expires_after(std::chrono::seconds(30));
-        timer.async_wait(std::bind_front(onTimeout, weak_from_this()));
+        timer.async_wait([weak = weak_from_this()](
+                             const boost::system::error_code& ec) {
+            onTimeout(weak, ec);
+        });
 
         // Receive the HTTP response
         if (sslConn)
         {
             boost::beast::http::async_read(
                 *sslConn, buffer, thisParser,
-                std::bind_front(&ConnectionInfo::afterRead,
-                                shared_from_this()));
+                [self = shared_from_this()](
+                    const boost::beast::error_code& ec,
+                    size_t bytesTransferred) {
+                    self->afterRead(self, ec, bytesTransferred);
+                });
         }
         else
         {
             boost::beast::http::async_read(
                 conn, buffer, thisParser,
-                std::bind_front(&ConnectionInfo::afterRead,
-                                shared_from_this()));
+                [self = shared_from_this()](
+                    const boost::beast::error_code& ec,
+                    size_t bytesTransferred) {
+                    self->afterRead(self, ec, bytesTransferred);
+                });
         }
     }
 
@@ -561,8 +573,10 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
         }
 
         sslConn->async_shutdown(
-            std::bind_front(&ConnectionInfo::afterSslShutdown,
-                            shared_from_this(), retry));
+            [self = shared_from_this(), retry](
+                const boost::system::error_code& ec) {
+                self->afterSslShutdown(self, retry, ec);
+            });
     }
 
     void afterSslShutdown(const std::shared_ptr<ConnectionInfo>& /*self*/,
