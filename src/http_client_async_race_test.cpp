@@ -101,7 +101,7 @@ void testDestroyDuringCallbackProcessing(boost::asio::io_context& ioc, int itera
     policy->maxRetryAttempts = 0;  // No retries - fail fast
     policy->retryIntervalSecs = std::chrono::seconds(0);
     policy->maxConnections = 2;
-    policy->requestTimeoutMs = std::chrono::milliseconds(100);  // Short timeout
+    // Note: 1110 branch has hardcoded 30s timeout in http_client.hpp
 
     int completed = 0;
 
