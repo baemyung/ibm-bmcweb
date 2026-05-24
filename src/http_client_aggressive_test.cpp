@@ -4,6 +4,7 @@
 // are in flight.
 
 #include "boost_formatters.hpp"
+#include "dbus_singleton.hpp"
 #include "http/http_client.hpp"
 #include "ssl_key_handler.hpp"
 
@@ -11,6 +12,7 @@
 #include <boost/beast/http/field.hpp>
 #include <boost/beast/http/verb.hpp>
 #include <boost/url/url_view.hpp>
+#include <sdbusplus/asio/connection.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -161,6 +163,12 @@ int main(int argc, char* argv[])
 
     boost::asio::io_context ioc;
     
+    // Initialize D-Bus connection (required for async_resolve)
+    std::cout << "Initializing D-Bus connection...\n";
+    sdbusplus::asio::connection systemBusConn(ioc);
+    crow::connections::systemBus = &systemBusConn;
+    std::cout << "D-Bus connection initialized\n";
+    
     // Use work guard to keep io_context alive
     auto work = boost::asio::make_work_guard(ioc);
     
@@ -203,6 +211,7 @@ int main(int argc, char* argv[])
     catch (const std::exception& e)
     {
         std::cerr << "Exception: " << e.what() << "\n";
+        crow::connections::systemBus = nullptr;
     }
 
     // Stop io_context and wait for all threads
@@ -246,6 +255,11 @@ int main(int argc, char* argv[])
     std::cout << "All IO threads stopped\n";
     std::cout << "Final count: created " << clientsCreated.load()
               << ", destroyed " << clientsDestroyed.load() << " clients\n";
+    
+    // Clean up D-Bus connection
+    crow::connections::systemBus = nullptr;
+    std::cout << "D-Bus connection cleaned up\n";
+    
     return 0;
 }
 
