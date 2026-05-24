@@ -193,8 +193,8 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
 
         timer.expires_after(std::chrono::seconds(30));
         timer.async_wait([weak = weak_from_this()](
-                             const boost::system::error_code& ec) {
-            onTimeout(weak, ec);
+                             const boost::system::error_code& ec3) {
+            onTimeout(weak, ec3);
         });
 
         boost::asio::async_connect(
