@@ -255,8 +255,10 @@ int main(int argc, char* argv[])
         {
             ioc.poll_one();
         }
-        std::cout << "Stopping io_context to cancel pending operations...\n";
+        std::cout << "Stopping io_context and processing cancellations...\n";
         ioc.stop();
+        // Process all cancellation handlers
+        while (ioc.poll_one() > 0) {}
         ioc.restart();
         
         clientsCreated = 0;
@@ -271,8 +273,10 @@ int main(int argc, char* argv[])
         {
             ioc.poll_one();
         }
-        std::cout << "Stopping io_context to cancel pending operations...\n";
+        std::cout << "Stopping io_context and processing cancellations...\n";
         ioc.stop();
+        // Process all cancellation handlers
+        while (ioc.poll_one() > 0) {}
         ioc.restart();
         
         clientsCreated = 0;
@@ -287,8 +291,10 @@ int main(int argc, char* argv[])
         {
             ioc.poll_one();
         }
-        std::cout << "Stopping io_context to cancel pending operations...\n";
+        std::cout << "Stopping io_context and processing cancellations...\n";
         ioc.stop();
+        // Process all cancellation handlers
+        while (ioc.poll_one() > 0) {}
 
         // Final processing with timeout
         std::cout << "\nFinal processing (max 5 seconds)...\n";
@@ -299,9 +305,11 @@ int main(int argc, char* argv[])
             ioc.poll_one();
         }
         
-        // Stop any remaining operations
+        // Stop any remaining operations and process cancellations
+        std::cout << "Stopping io_context and processing final cancellations...\n";
         ioc.stop();
-        std::cout << "Stopped io_context\n";
+        while (ioc.poll_one() > 0) {}
+        std::cout << "All operations cancelled and processed\n";
 
         std::cout << "\n" << std::string(70, '=') << "\n";
         std::cout << "All tests completed!\n";
