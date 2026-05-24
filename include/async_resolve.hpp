@@ -64,11 +64,15 @@ class Resolver
     void async_resolve(std::string_view host, std::string_view port,
                        ResolveHandler&& handler)
     {
-        BMCWEB_LOG_DEBUG("Trying to resolve: {}:{}", host, port);
+        // Copy string_views to strings immediately to avoid dangling references
+        std::string hostStr(host);
+        std::string portStr(port);
+        
+        BMCWEB_LOG_DEBUG("Trying to resolve: {}:{}", hostStr, portStr);
 
         uint16_t portNum = 0;
 
-        auto it = std::from_chars(&*port.begin(), &*port.end(), portNum);
+        auto it = std::from_chars(&*portStr.begin(), &*portStr.end(), portNum);
         if (it.ec != std::errc())
         {
             BMCWEB_LOG_ERROR("Failed to get the Port");
@@ -80,7 +84,7 @@ class Resolver
 
         uint64_t flag = 0;
         crow::connections::systemBus->async_method_call(
-            [host{std::string(host)}, portNum,
+            [host{std::move(hostStr)}, portNum,
              handler = std::forward<ResolveHandler>(handler)](
                 const boost::system::error_code& ec,
                 const std::vector<
