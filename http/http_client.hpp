@@ -218,17 +218,22 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
                       const boost::beast::error_code& ec,
                       const boost::asio::ip::tcp::endpoint& endpoint)
     {
+        BMCWEB_LOG_DEBUG("[CONNECT ENTRY] afterConnect called, connId={}, ec={}",
+                         connId, ec.message());
+        
         // The operation already timed out.  We don't want do continue down
         // this branch
         if (ec && ec == boost::asio::error::operation_aborted)
         {
+            BMCWEB_LOG_DEBUG("[CONNECT ABORTED] Connection aborted, connId={}", connId);
             return;
         }
 
+        BMCWEB_LOG_DEBUG("[CONNECT CANCEL] Cancelling timer, connId={}", connId);
         timer.cancel();
         if (ec)
         {
-            BMCWEB_LOG_ERROR("Connect {}:{}, id: {} failed: {}",
+            BMCWEB_LOG_ERROR("[CONNECT FAILED] Connect {}:{}, id: {} failed: {}",
                              host.encoded_host_address(), host.port(), connId,
                              ec.message());
             state = ConnState::connectFailed;
@@ -453,24 +458,32 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
     static void onTimeout(const std::weak_ptr<ConnectionInfo>& weakSelf,
                           const boost::system::error_code& ec)
     {
+        BMCWEB_LOG_DEBUG("[TIMEOUT ENTRY] onTimeout called, ec={}", ec.message());
+        
         if (ec == boost::asio::error::operation_aborted)
         {
             BMCWEB_LOG_DEBUG(
-                "async_wait failed since the operation is aborted");
+                "[TIMEOUT ABORTED] async_wait failed since the operation is aborted");
             return;
         }
         if (ec)
         {
-            BMCWEB_LOG_ERROR("async_wait failed: {}", ec.message());
+            BMCWEB_LOG_ERROR("[TIMEOUT ERROR] async_wait failed: {}", ec.message());
             // If the timer fails, we need to close the socket anyway, same
             // as if it expired.
         }
+        
+        BMCWEB_LOG_DEBUG("[TIMEOUT LOCK] Attempting to lock weak_ptr...");
         std::shared_ptr<ConnectionInfo> self = weakSelf.lock();
         if (self == nullptr)
         {
+            BMCWEB_LOG_DEBUG("[TIMEOUT LOCK FAILED] weak_ptr lock failed - ConnectionInfo destroyed");
             return;
         }
+        BMCWEB_LOG_DEBUG("[TIMEOUT LOCK OK] weak_ptr locked successfully, connId={}", self->connId);
+        BMCWEB_LOG_DEBUG("[TIMEOUT RETRY] Calling waitAndRetry()...");
         self->waitAndRetry();
+        BMCWEB_LOG_DEBUG("[TIMEOUT EXIT] onTimeout completed for connId={}", self->connId);
     }
 
     void waitAndRetry()
