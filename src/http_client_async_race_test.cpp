@@ -4,6 +4,7 @@
 // async operations are still pending in the io_context queue.
 
 #include "boost_formatters.hpp"
+#include "dbus_singleton.hpp"
 #include "http/http_client.hpp"
 #include "ssl_key_handler.hpp"
 
@@ -12,6 +13,7 @@
 #include <boost/beast/http/field.hpp>
 #include <boost/beast/http/verb.hpp>
 #include <boost/url/url_view.hpp>
+#include <sdbusplus/asio/connection.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -229,6 +231,12 @@ int main(int argc, char* argv[])
 
     boost::asio::io_context ioc;
     
+    // Initialize D-Bus connection (required for async_resolve)
+    std::cout << "\nInitializing D-Bus connection...\n";
+    sdbusplus::asio::connection systemBusConn(ioc);
+    crow::connections::systemBus = &systemBusConn;
+    std::cout << "D-Bus connection initialized\n";
+    
     // Use work guard to keep io_context alive during tests
     auto work = boost::asio::make_work_guard(ioc);
     
@@ -276,6 +284,7 @@ int main(int argc, char* argv[])
     catch (const std::exception& e)
     {
         std::cerr << "\nException caught: " << e.what() << "\n";
+        crow::connections::systemBus = nullptr;
         work.reset();
         if (ioThread.joinable())
         {
@@ -291,6 +300,11 @@ int main(int argc, char* argv[])
         ioThread.join();
     }
 
+    // Clean up D-Bus connection
+    crow::connections::systemBus = nullptr;
+    std::cout << "D-Bus connection cleaned up\n";
+
+    std::cout << "\nTest program completed successfully\n";
     return 0;
 }
 
