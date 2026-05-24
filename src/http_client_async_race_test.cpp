@@ -41,7 +41,7 @@ void testImmediateDestruction(boost::asio::io_context& ioc, int iterations)
     policy->maxRetryAttempts = 0;  // No retries - fail fast
     policy->retryIntervalSecs = std::chrono::seconds(0);
     policy->maxConnections = 3;
-    policy->requestTimeoutMs = std::chrono::milliseconds(100);  // Short timeout
+    // Note: 1110 branch has hardcoded 30s timeout in http_client.hpp
 
     for (int i = 0; i < iterations; i++)
     {
@@ -167,7 +167,7 @@ void testRapidCycles(boost::asio::io_context& ioc, int cycles)
     auto policy = std::make_shared<crow::ConnectionPolicy>();
     policy->maxRetryAttempts = 0;  // No retries - fail fast
     policy->maxConnections = 2;
-    policy->requestTimeoutMs = std::chrono::milliseconds(100);  // Short timeout
+    // Note: 1110 branch has hardcoded 30s timeout in http_client.hpp
 
     for (int cycle = 0; cycle < cycles; cycle++)
     {
