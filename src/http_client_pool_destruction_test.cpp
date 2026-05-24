@@ -1,9 +1,11 @@
 // Test to reproduce ConnectionPool coredump by destroying pool during callback
 #include "boost_formatters.hpp"
+#include "dbus_singleton.hpp"
 #include "http_client.hpp"
 #include "ssl_key_handler.hpp"
 
 #include <boost/asio/io_context.hpp>
+#include <sdbusplus/asio/connection.hpp>
 
 #include <chrono>
 #include <iostream>
@@ -16,6 +18,10 @@ std::shared_ptr<crow::HttpClient> globalClient;
 void testPoolDestructionDuringCallback()
 {
     boost::asio::io_context ioc;
+    
+    // Initialize systemBus for DNS resolution
+    sdbusplus::asio::connection systemBus(ioc);
+    crow::connections::systemBus = &systemBus;
     
     std::cout << "Creating HTTP client..." << std::endl;
     
@@ -61,6 +67,9 @@ void testPoolDestructionDuringCallback()
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+    
+    // Cleanup
+    crow::connections::systemBus = nullptr;
     
     std::cout << "Test completed without crash (pool was protected by weak_ptr)" << std::endl;
 }
