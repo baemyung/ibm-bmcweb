@@ -1,7 +1,7 @@
-// HTTP Client Async Race Condition Test (Single-Threaded)
-// This test simulates the actual async race conditions in bmcweb's
-// single-threaded environment where objects are destroyed while
-// async operations are still pending in the io_context queue.
+// HTTP Client Async Race Condition Test (True Single-Threaded)
+// This test simulates bmcweb's actual single-threaded environment where
+// objects are destroyed while async operations are still pending.
+// Everything runs in the main thread, just like bmcweb.
 
 #include "boost_formatters.hpp"
 #include "dbus_singleton.hpp"
@@ -223,8 +223,9 @@ int main(int argc, char* argv[])
     std::cout << std::string(70, '=') << "\n";
     std::cout << "This test simulates bmcweb's single-threaded async environment\n";
     std::cout << "where objects are destroyed while async operations are pending.\n";
-    std::cout << "\nKey difference from aggressive test:\n";
-    std::cout << "  - Single io_context thread (like bmcweb)\n";
+    std::cout << "\nKey characteristics:\n";
+    std::cout << "  - True single-threaded (main thread only)\n";
+    std::cout << "  - All operations in one thread (like bmcweb)\n";
     std::cout << "  - Tests async callback execution order\n";
     std::cout << "  - Focuses on destruction timing, not concurrency\n";
     std::cout << std::string(70, '=') << "\n";
@@ -232,41 +233,46 @@ int main(int argc, char* argv[])
     boost::asio::io_context ioc;
     
     // Initialize D-Bus connection (required for async_resolve)
+    // IMPORTANT: Must be created in the same thread that runs io_context
     std::cout << "\nInitializing D-Bus connection...\n";
     sdbusplus::asio::connection systemBusConn(ioc);
     crow::connections::systemBus = &systemBusConn;
     std::cout << "D-Bus connection initialized\n";
-    
-    // Use work guard to keep io_context alive during tests
-    auto work = boost::asio::make_work_guard(ioc);
-    
-    // Run io_context in a single thread (like bmcweb)
-    std::thread ioThread([&ioc]() {
-        std::cout << "\nIO thread started (single-threaded like bmcweb)\n";
-        ioc.run();
-        std::cout << "IO thread stopped\n";
-    });
 
     try
     {
-        // Give io_context time to start
-        std::this_thread::sleep_for(100ms);
-
-        // Run tests
+        // Run tests - they will post work to io_context
+        std::cout << "\nRunning tests (single-threaded like bmcweb)...\n";
         testImmediateDestruction(ioc, iterations);
-        std::this_thread::sleep_for(500ms);
+        
+        // Process all pending async operations
+        std::cout << "\nProcessing async operations...\n";
+        ioc.poll();
+        ioc.restart();
         
         clientsCreated = 0;
         clientsDestroyed = 0;
         requestsSent = 0;
         testDestroyDuringCallbackProcessing(ioc, iterations / 2);
-        std::this_thread::sleep_for(500ms);
+        
+        // Process all pending async operations
+        std::cout << "\nProcessing async operations...\n";
+        ioc.poll();
+        ioc.restart();
         
         clientsCreated = 0;
         clientsDestroyed = 0;
         requestsSent = 0;
         testRapidCycles(ioc, iterations / 5);
-        std::this_thread::sleep_for(500ms);
+        
+        // Process all pending async operations
+        std::cout << "\nProcessing async operations...\n";
+        ioc.poll();
+        ioc.restart();
+
+        // Run io_context to completion (process all remaining work)
+        std::cout << "\nProcessing remaining async operations...\n";
+        ioc.run();
 
         std::cout << "\n" << std::string(70, '=') << "\n";
         std::cout << "All tests completed!\n";
@@ -285,19 +291,7 @@ int main(int argc, char* argv[])
     {
         std::cerr << "\nException caught: " << e.what() << "\n";
         crow::connections::systemBus = nullptr;
-        work.reset();
-        if (ioThread.joinable())
-        {
-            ioThread.join();
-        }
         return 1;
-    }
-
-    // Stop io_context and wait for thread
-    work.reset();
-    if (ioThread.joinable())
-    {
-        ioThread.join();
     }
 
     // Clean up D-Bus connection
