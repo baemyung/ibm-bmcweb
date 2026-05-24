@@ -38,9 +38,10 @@ void testImmediateDestruction(boost::asio::io_context& ioc, int iterations)
     std::cout << "This tests if callbacks handle destroyed ConnectionPool correctly\n\n";
 
     auto policy = std::make_shared<crow::ConnectionPolicy>();
-    policy->maxRetryAttempts = 2;
+    policy->maxRetryAttempts = 0;  // No retries - fail fast
     policy->retryIntervalSecs = std::chrono::seconds(0);
     policy->maxConnections = 3;
+    policy->requestTimeoutMs = std::chrono::milliseconds(100);  // Short timeout
 
     for (int i = 0; i < iterations; i++)
     {
@@ -97,9 +98,10 @@ void testDestroyDuringCallbackProcessing(boost::asio::io_context& ioc, int itera
     std::cout << "This tests if callbacks can handle mid-execution destruction\n\n";
 
     auto policy = std::make_shared<crow::ConnectionPolicy>();
-    policy->maxRetryAttempts = 1;
+    policy->maxRetryAttempts = 0;  // No retries - fail fast
     policy->retryIntervalSecs = std::chrono::seconds(0);
     policy->maxConnections = 2;
+    policy->requestTimeoutMs = std::chrono::milliseconds(100);  // Short timeout
 
     int completed = 0;
 
@@ -163,8 +165,9 @@ void testRapidCycles(boost::asio::io_context& ioc, int cycles)
     std::cout << "This tests if the io_context queue handles destruction correctly\n\n";
 
     auto policy = std::make_shared<crow::ConnectionPolicy>();
-    policy->maxRetryAttempts = 1;
+    policy->maxRetryAttempts = 0;  // No retries - fail fast
     policy->maxConnections = 2;
+    policy->requestTimeoutMs = std::chrono::milliseconds(100);  // Short timeout
 
     for (int cycle = 0; cycle < cycles; cycle++)
     {
@@ -245,9 +248,13 @@ int main(int argc, char* argv[])
         std::cout << "\nRunning tests (single-threaded like bmcweb)...\n";
         testImmediateDestruction(ioc, iterations);
         
-        // Process all pending async operations
-        std::cout << "\nProcessing async operations...\n";
-        ioc.poll();
+        // Process pending async operations with timeout
+        std::cout << "\nProcessing async operations (max 3 seconds)...\n";
+        auto deadline = std::chrono::steady_clock::now() + 3s;
+        while (std::chrono::steady_clock::now() < deadline && !ioc.stopped())
+        {
+            ioc.poll_one();
+        }
         ioc.restart();
         
         clientsCreated = 0;
@@ -255,9 +262,13 @@ int main(int argc, char* argv[])
         requestsSent = 0;
         testDestroyDuringCallbackProcessing(ioc, iterations / 2);
         
-        // Process all pending async operations
-        std::cout << "\nProcessing async operations...\n";
-        ioc.poll();
+        // Process pending async operations with timeout
+        std::cout << "\nProcessing async operations (max 3 seconds)...\n";
+        deadline = std::chrono::steady_clock::now() + 3s;
+        while (std::chrono::steady_clock::now() < deadline && !ioc.stopped())
+        {
+            ioc.poll_one();
+        }
         ioc.restart();
         
         clientsCreated = 0;
@@ -265,14 +276,25 @@ int main(int argc, char* argv[])
         requestsSent = 0;
         testRapidCycles(ioc, iterations / 5);
         
-        // Process all pending async operations
-        std::cout << "\nProcessing async operations...\n";
-        ioc.poll();
-        ioc.restart();
+        // Process pending async operations with timeout
+        std::cout << "\nProcessing async operations (max 3 seconds)...\n";
+        deadline = std::chrono::steady_clock::now() + 3s;
+        while (std::chrono::steady_clock::now() < deadline && !ioc.stopped())
+        {
+            ioc.poll_one();
+        }
 
-        // Run io_context to completion (process all remaining work)
-        std::cout << "\nProcessing remaining async operations...\n";
-        ioc.run();
+        // Final processing with timeout
+        std::cout << "\nFinal processing (max 5 seconds)...\n";
+        deadline = std::chrono::steady_clock::now() + 5s;
+        while (std::chrono::steady_clock::now() < deadline && !ioc.stopped())
+        {
+            ioc.poll_one();
+        }
+        
+        // Stop any remaining operations
+        ioc.stop();
+        std::cout << "Stopped io_context\n";
 
         std::cout << "\n" << std::string(70, '=') << "\n";
         std::cout << "All tests completed!\n";
