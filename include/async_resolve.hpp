@@ -102,8 +102,8 @@ class Resolver
             return;
         }
         
-        BMCWEB_LOG_DEBUG("[TRACE 8.2] systemBus pointer is valid: {}",
-                         static_cast<void*>(crow::connections::systemBus));
+        BMCWEB_LOG_DEBUG("[TRACE 8.2] systemBus pointer is valid: 0x{:x}",
+                         reinterpret_cast<uintptr_t>(crow::connections::systemBus));
         
         uint64_t flag = 0;
         crow::connections::systemBus->async_method_call(
