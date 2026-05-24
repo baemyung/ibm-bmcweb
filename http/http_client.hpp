@@ -283,21 +283,28 @@ class ConnectionInfo : public std::enable_shared_from_this<ConnectionInfo>
 
         // Set a timeout on the operation
         timer.expires_after(std::chrono::seconds(30));
-        timer.async_wait(std::bind_front(onTimeout, weak_from_this()));
+        timer.async_wait([weak = weak_from_this()](
+                             const boost::system::error_code& ec) {
+            onTimeout(weak, ec);
+        });
         // Send the HTTP request to the remote host
         if (sslConn)
         {
             boost::beast::http::async_write(
                 *sslConn, req,
-                std::bind_front(&ConnectionInfo::afterWrite,
-                                shared_from_this()));
+                [self = shared_from_this()](
+                    const boost::beast::error_code& ec, size_t bytesTransferred) {
+                    self->afterWrite(self, ec, bytesTransferred);
+                });
         }
         else
         {
             boost::beast::http::async_write(
                 conn, req,
-                std::bind_front(&ConnectionInfo::afterWrite,
-                                shared_from_this()));
+                [self = shared_from_this()](
+                    const boost::beast::error_code& ec, size_t bytesTransferred) {
+                    self->afterWrite(self, ec, bytesTransferred);
+                });
         }
     }
 
