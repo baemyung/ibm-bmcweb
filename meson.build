@@ -447,3 +447,15 @@ if (get_option('tests').allowed())
         test(fs.stem(test_src), test_bin)
     endforeach
 endif
+
+# Generate the http_client_connectioninfo_destruction_test executable
+executable(
+    'http_client_connectioninfo_destruction_test',
+    'src/http_client_connectioninfo_destruction_test.cpp',
+    include_directories: incdir,
+    dependencies: bmcweb_dependencies,
+    link_with: bmcweblib,
+    install: true,
+    install_dir: bindir,
+)
+
