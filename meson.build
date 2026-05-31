@@ -374,6 +374,7 @@ executable(
 
 srcfiles_unittest = files(
    'test/http/crow_getroutes_test.cpp',
+    'test/http/http_client_coredump_test.cpp',
     'test/http/http2_connection_test.cpp',
     'test/http/http_body_test.cpp',
     'test/http/http_connection_test.cpp',
