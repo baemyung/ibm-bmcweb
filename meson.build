@@ -378,6 +378,7 @@ srcfiles_unittest = files(
     'test/http/http_body_test.cpp',
     'test/http/http_connection_test.cpp',
     'test/http/http_response_test.cpp',
+    'test/http/http_client_coredump_test.cpp',
     'test/http/mutual_tls.cpp',
     'test/http/mutual_tls_meta.cpp',
     'test/http/parsing_test.cpp',
