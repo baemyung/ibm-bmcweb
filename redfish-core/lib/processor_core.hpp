@@ -347,6 +347,10 @@ inline void doHandleSubProcessorCollectionGet(
     {
         std::string coreId =
             sdbusplus::message::object_path(corePath).filename();
+        BMCWEB_LOG_ERROR(
+            "TEST doHandleSubProcessorCollectionGet processorId={}, corePath={}, coreId={}",
+            processorId, corePath, coreId);
+
         if (!coreId.empty())
         {
             coreIdNames.emplace_back(std::move(coreId));
@@ -392,11 +396,21 @@ inline void handleSubProcessorCollectionGet(
         return;
     }
 
-    dbus::utility::getAssociatedSubTreePathsById(
-        processorId, "/xyz/openbmc_project/inventory", processorInterfaces,
-        "containing", procCoreInterfaces,
-        std::bind_front(doHandleSubProcessorCollectionGet, asyncResp,
-                        systemName, processorId));
+    getProcessorPaths(
+        asyncResp, processorId,
+        [asyncResp, systemName, processorId](const std::string& cpuPath) {
+            BMCWEB_LOG_ERROR(
+                "TEST: handleSubProcessorCollectionGet processorId={}, cpuPath={}",
+                processorId, cpuPath);
+
+            dbus::utility::getAssociatedSubTreePaths(
+                cpuPath + "/containing",
+                sdbusplus::message::object_path(
+                    "/xyz/openbmc_project/inventory"),
+                0, procCoreInterfaces,
+                std::bind_front(doHandleSubProcessorCollectionGet, asyncResp,
+                                systemName, processorId));
+        });
 }
 
 inline void handleSubProcessorCoreGet(
