@@ -442,6 +442,7 @@ inline void assembleDimmProperties(
     const std::string* model = nullptr;
     const std::string* locationCode = nullptr;
     const bool* functional = nullptr;
+    const bool* available = nullptr;
 
     const bool success = sdbusplus::unpackPropertiesNoThrow(
         dbus_utils::UnpackErrorPrinter(), properties, "MemoryDataWidth",
@@ -454,7 +455,8 @@ inline void assembleDimmProperties(
         memoryConfiguredSpeedInMhz, "MemoryType", memoryType, "Channel",
         channel, "MemoryController", memoryController, "Slot", slot, "Socket",
         socket, "SparePartNumber", sparePartNumber, "Model", model,
-        "LocationCode", locationCode, "Functional", functional);
+        "LocationCode", locationCode, "Functional", functional, "Available",
+        available);
 
     if (!success)
     {
@@ -498,6 +500,11 @@ inline void assembleDimmProperties(
     {
         asyncResp->res.jsonValue[jsonPtr]["Status"]["State"] =
             resource::State::Absent;
+    }
+    else if (available != nullptr && !*available)
+    {
+        asyncResp->res.jsonValue[jsonPtr]["Status"]["State"] =
+            resource::State::UnavailableOffline;
     }
 
     if (memoryTotalWidth != nullptr)
