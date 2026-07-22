@@ -2330,8 +2330,7 @@ nlohmann::json::object_t generateSecretKeyRequired(
 void generateSecretKeyRequired(crow::Response& res,
                                const boost::urls::url_view_base& arg1)
 {
-    res.result(boost::beast::http::status::forbidden);
-    addMessageToErrorJson(res.jsonValue, generateSecretKeyRequired(arg1));
+    addMessageToJsonRoot(res.jsonValue, generateSecretKeyRequired(arg1));
 }
 
 } // namespace messages

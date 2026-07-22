@@ -232,7 +232,7 @@ def get_response_code(entry_id: str) -> str | None:
         "Created": "created",
         "EventSubscriptionLimitExceeded": "service_unavailable",
         "GeneralError": "internal_server_error",
-        "GenerateSecretKeyRequired": "forbidden",
+        "GenerateSecretKeyRequired": None,
         "InsufficientPrivilege": "forbidden",
         "InsufficientStorage": "insufficient_storage",
         "InstallFailed": "internal_server_error",
@@ -417,6 +417,7 @@ def make_error_function(
                 "Created",
                 "Success",
                 "PasswordChangeRequired",
+                "GenerateSecretKeyRequired",
             ]
 
             if entry_id in addMessageToJson:
