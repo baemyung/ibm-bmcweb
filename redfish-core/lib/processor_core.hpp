@@ -8,6 +8,7 @@
 #include "async_resp.hpp"
 #include "dbus_utility.hpp"
 #include "error_messages.hpp"
+#include "generated/enums/processor.hpp"
 #include "generated/enums/resource.hpp"
 #include "http_request.hpp"
 #include "logging.hpp"
@@ -29,6 +30,7 @@
 
 #include <algorithm>
 #include <array>
+#include <filesystem>
 #include <format>
 #include <functional>
 #include <memory>
@@ -67,7 +69,8 @@ inline void doHandleSubProcessorCoreHead(
 
     const auto& it =
         std::ranges::find_if(coreSubTree, [coreId](const auto& coreMap) {
-            return sdbusplus::message::object_path(coreMap.first).filename() == coreId;
+            return sdbusplus::message::object_path(coreMap.first).filename() ==
+                   coreId;
         });
     if (it == coreSubTree.end())
     {
@@ -126,6 +129,7 @@ inline void getSubProcessorCoreData(
         processorId, coreId);
     asyncResp->res.jsonValue["Name"] = "SubProcessor";
     asyncResp->res.jsonValue["Id"] = coreId;
+    asyncResp->res.jsonValue["ProcessorType"] = processor::ProcessorType::Core;
 }
 
 inline void doHandleSubProcessorCoreGet(
@@ -150,7 +154,8 @@ inline void doHandleSubProcessorCoreGet(
 
     const auto& it =
         std::ranges::find_if(coreSubTree, [coreId](const auto& coreMap) {
-            return sdbusplus::message::object_path(coreMap.first).filename() == coreId;
+            return sdbusplus::message::object_path(coreMap.first).filename() ==
+                   coreId;
         });
     if (it == coreSubTree.end())
     {
@@ -188,16 +193,38 @@ inline void handleSubProcessorCoreGet(
     }
 
     dbus::utility::getAssociatedSubTreeById(
-        processorId, "/xyz/openbmc_project/inventory", processorInterfaces,
+        processorId, "/xyz/openbmc_project/inventory", procCoreInterfaces,
         "containing", procCoreInterfaces,
         std::bind_front(doHandleSubProcessorCoreGet, asyncResp, systemName,
                         processorId, coreId));
 }
 
+inline void doHandleSubProcessorCollectionHead(
+    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
+    const std::string& processorId, const boost::system::error_code& ec,
+    const dbus::utility::MapperGetSubTreePathsResponse& /* coreSubTreePaths */)
+{
+    if (ec)
+    {
+        if (ec.value() != boost::system::errc::io_error)
+        {
+            BMCWEB_LOG_ERROR("DBUS response error {}", ec.value());
+            messages::internalError(asyncResp->res);
+            return;
+        }
+        BMCWEB_LOG_WARNING("Processor {} not found.", processorId);
+        messages::resourceNotFound(asyncResp->res, "Processor", processorId);
+        return;
+    }
+    asyncResp->res.addHeader(
+        boost::beast::http::field::link,
+        "</redfish/v1/JsonSchemas/ProcessorCollection/ProcessorCollection.json>; rel=describedby");
+}
+
 inline void handleSubProcessorCollectionHead(
     crow::App& app, const crow::Request& req,
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-    const std::string& systemName, const std::string& /* processorId */)
+    const std::string& systemName, const std::string& processorId)
 {
     if (!redfish::setUpRedfishRoute(app, req, asyncResp))
     {
@@ -219,9 +246,11 @@ inline void handleSubProcessorCollectionHead(
         return;
     }
 
-    asyncResp->res.addHeader(
-        boost::beast::http::field::link,
-        "</redfish/v1/JsonSchemas/ProcessorCollection/ProcessorCollection.json>; rel=describedby");
+    dbus::utility::getAssociatedSubTreePathsById(
+        processorId, "/xyz/openbmc_project/inventory", processorInterfaces,
+        "containing", procCoreInterfaces,
+        std::bind_front(doHandleSubProcessorCollectionHead, asyncResp,
+                        processorId));
 }
 
 inline void doHandleSubProcessorCollectionGet(
@@ -230,14 +259,22 @@ inline void doHandleSubProcessorCollectionGet(
     const boost::system::error_code& ec,
     const dbus::utility::MapperGetSubTreePathsResponse& coreSubTreePaths)
 {
-    if (ec == boost::system::errc::io_error)
+    if (ec)
     {
-        // getAssociatedSubTreePathsById() returns io_error if processorId does
-        // not exist
+        if (ec.value() != boost::system::errc::io_error)
+        {
+            BMCWEB_LOG_ERROR("DBUS response error {}", ec.value());
+            messages::internalError(asyncResp->res);
+            return;
+        }
         BMCWEB_LOG_WARNING("Processor {} not found.", processorId);
         messages::resourceNotFound(asyncResp->res, "Processor", processorId);
         return;
     }
+    asyncResp->res.addHeader(
+        boost::beast::http::field::link,
+        "</redfish/v1/JsonSchemas/ProcessorCollection/ProcessorCollection.json>; rel=describedby");
+
     asyncResp->res.jsonValue["@odata.type"] =
         "#ProcessorCollection.ProcessorCollection";
     asyncResp->res.jsonValue["@odata.id"] = boost::urls::format(
