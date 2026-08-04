@@ -42,12 +42,13 @@ namespace
 // URI prefix-fixing for event-like payloads
 // ---------------------------------------------------------------------------
 
-// OriginOfCondition is intentionally excluded from URI prefix-fixing because
-// it is an object in responses (see comment in nonUriProperties array).
-// This test documents that OriginOfCondition strings inside an Events array
-// do NOT get prefixed — the existing behaviour that callers must be aware of
-// when forwarding satellite events.
-TEST(SatelliteEventForwarding, OriginOfConditionNotPrefixedInEventPayload)
+// OriginOfCondition is excluded from nonUriProperties because in regular
+// Redfish responses it is an object (not a URI string).  However, inside an
+// Events array it IS a plain string URI representing a satellite resource.
+// addPrefixes() now detects the string case and applies the same prefix-fixing
+// as any other URI property, so the satellite resource is correctly identified
+// on the aggregating BMC.
+TEST(SatelliteEventForwarding, OriginOfConditionStringInEventPayloadGetsPrefixed)
 {
     nlohmann::json eventPayload = nlohmann::json::parse(R"(
     {
@@ -67,11 +68,11 @@ TEST(SatelliteEventForwarding, OriginOfConditionNotPrefixedInEventPayload)
 
     addPrefixes(eventPayload, "sat1");
 
-    // OriginOfCondition is excluded from URI fixing — it stays unchanged.
+    // OriginOfCondition is a string URI here, so it must be prefix-fixed.
     const std::string& origin =
         eventPayload["Events"][0]["OriginOfCondition"].get_ref<
             const std::string&>();
-    EXPECT_EQ(origin, "/redfish/v1/Chassis/SatChassis");
+    EXPECT_EQ(origin, "/redfish/v1/Chassis/sat1_SatChassis");
 }
 
 // @odata.id inside an event payload DOES get prefix-fixed, because it is in

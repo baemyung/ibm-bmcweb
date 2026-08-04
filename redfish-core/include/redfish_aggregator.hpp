@@ -6,20 +6,24 @@
 #include "async_resp.hpp"
 #include "dbus_utility.hpp"
 #include "error_messages.hpp"
+#include "event_service_manager.hpp"
 #include "http_client.hpp"
 #include "http_request.hpp"
 #include "http_response.hpp"
 #include "io_context_singleton.hpp"
 #include "logging.hpp"
 #include "parsing.hpp"
+#include "resource_messages.hpp"
 #include "ssl_key_handler.hpp"
 #include "utility.hpp"
 
+#include <boost/asio/steady_timer.hpp>
 #include <boost/beast/http/field.hpp>
 #include <boost/beast/http/status.hpp>
 #include <boost/beast/http/verb.hpp>
 #include <boost/system/errc.hpp>
 #include <boost/system/result.hpp>
+#include <boost/url/format.hpp>
 #include <boost/url/param.hpp>
 #include <boost/url/parse.hpp>
 #include <boost/url/segments_ref.hpp>
@@ -377,6 +381,18 @@ inline void addPrefixes(nlohmann::json& json, std::string_view prefix)
             if (item.first == "HttpHeaders")
             {
                 addPrefixToHeadersInResp(item.second, prefix);
+                continue;
+            }
+
+            // OriginOfCondition is excluded from nonUriProperties because in
+            // regular Redfish responses it is an object, not a URI string.
+            // However, in Event payloads it appears as a plain string URI inside
+            // the Events array.  When the value is a string we apply the same
+            // prefix-fixing as any other URI property.
+            if (item.first == "OriginOfCondition" &&
+                item.second.is_string())
+            {
+                addPrefixToItem(item.second, prefix);
                 continue;
             }
 
