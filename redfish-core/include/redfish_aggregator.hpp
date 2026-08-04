@@ -429,17 +429,34 @@ inline crow::ConnectionPolicy getAggregationPolicy()
             .invalidResp = aggregationRetryHandler};
 }
 
+// Number of consecutive failures before a satellite is considered unreachable.
+constexpr unsigned int satelliteHealthFailureThreshold = 3;
+
+// Interval for the periodic satellite health-check polling.
+constexpr std::chrono::seconds satelliteHealthCheckInterval{60};
+
+enum class SatelliteHealthState
+{
+    Healthy,
+    Critical,
+};
+
 struct AggregationSource
 {
     boost::urls::url url;
     std::string username;
     std::string password;
+
+    // Health monitoring state (not persisted across restarts).
+    SatelliteHealthState healthState{SatelliteHealthState::Healthy};
+    unsigned int consecutiveFailures{0};
 };
 
 class RedfishAggregator
 {
   private:
     crow::HttpClient client;
+    boost::asio::steady_timer healthCheckTimer;
 
     // callback used by the Constructor to report the number
     // of satellite configs when the class is first created
@@ -916,13 +933,59 @@ class RedfishAggregator
         }
     }
 
+    // Periodic satellite health-check: sends a GET /redfish/v1 probe to each
+    // registered satellite and updates their health state via updateSatelliteHealth.
+    void scheduleHealthCheck()
+    {
+        healthCheckTimer.expires_after(satelliteHealthCheckInterval);
+        healthCheckTimer.async_wait(
+            [this](const boost::system::error_code& ec) {
+                if (ec)
+                {
+                    // Timer cancelled (e.g. shutdown) — stop scheduling.
+                    return;
+                }
+                BMCWEB_LOG_DEBUG(
+                    "Running periodic satellite health check for {} sources",
+                    aggregationSources.size());
+                for (const auto& [prefix, source] : aggregationSources)
+                {
+                    boost::urls::url probeUrl(source.url);
+                    probeUrl.set_path("/redfish/v1");
+
+                    boost::beast::http::fields requestFields;
+                    requestFields.set(boost::beast::http::field::accept,
+                                      "application/json");
+
+                    // Capture prefix by value for the callback closure.
+                    std::string capturedPrefix(prefix);
+                    client.sendDataWithCallback(
+                        std::string{}, probeUrl,
+                        ensuressl::VerifyCertificate::Verify, requestFields,
+                        boost::beast::http::verb::get,
+                        [capturedPrefix](crow::Response& resp) {
+                            bool reachable =
+                                (resp.result() !=
+                                 boost::beast::http::status::too_many_requests) &&
+                                (resp.result() !=
+                                 boost::beast::http::status::bad_gateway);
+                            updateSatelliteHealth(capturedPrefix, reachable);
+                        });
+                }
+                // Reschedule for the next interval.
+                scheduleHealthCheck();
+            });
+    }
+
   public:
     explicit RedfishAggregator() :
         client(getIoContext(),
-               std::make_shared<crow::ConnectionPolicy>(getAggregationPolicy()))
+               std::make_shared<crow::ConnectionPolicy>(getAggregationPolicy())),
+        healthCheckTimer(getIoContext())
     {
         getSatelliteConfigs(
             std::bind_front(&RedfishAggregator::constructorCallback, this));
+        scheduleHealthCheck();
     }
     RedfishAggregator(const RedfishAggregator&) = delete;
     RedfishAggregator& operator=(const RedfishAggregator&) = delete;
@@ -1018,6 +1081,51 @@ class RedfishAggregator
             });
     }
 
+    // Update per-satellite health state on success or failure.
+    // Emits a ResourceStatusChanged event when the state transitions.
+    static void updateSatelliteHealth(std::string_view prefix, bool success)
+    {
+        RedfishAggregator& self = getInstance();
+        auto it = self.aggregationSources.find(std::string(prefix));
+        if (it == self.aggregationSources.end())
+        {
+            return;
+        }
+        AggregationSource& source = it->second;
+        std::string aggregationSourceUri =
+            boost::urls::format(
+                "/redfish/v1/AggregationService/AggregationSources/{}", prefix)
+                .buffer();
+
+        if (success)
+        {
+            source.consecutiveFailures = 0;
+            if (source.healthState == SatelliteHealthState::Critical)
+            {
+                BMCWEB_LOG_INFO("Satellite \"{}\" has recovered", prefix);
+                source.healthState = SatelliteHealthState::Healthy;
+                EventServiceManager::getInstance().sendEvent(
+                    messages::resourceStatusChangedOK(prefix, "OK"),
+                    aggregationSourceUri, "AggregationSource");
+            }
+        }
+        else
+        {
+            source.consecutiveFailures++;
+            if (source.consecutiveFailures >= satelliteHealthFailureThreshold &&
+                source.healthState != SatelliteHealthState::Critical)
+            {
+                BMCWEB_LOG_WARNING(
+                    "Satellite \"{}\" is unreachable after {} consecutive failures",
+                    prefix, source.consecutiveFailures);
+                source.healthState = SatelliteHealthState::Critical;
+                EventServiceManager::getInstance().sendEvent(
+                    messages::resourceStatusChangedCritical(prefix, "Critical"),
+                    aggregationSourceUri, "AggregationSource");
+            }
+        }
+    }
+
     // Processes the response returned by a satellite BMC and loads its
     // contents into asyncResp
     static void processResponse(
@@ -1031,8 +1139,13 @@ class RedfishAggregator
             (resp.result() == boost::beast::http::status::bad_gateway))
         {
             asyncResp->res.result(resp.result());
+            updateSatelliteHealth(prefix, /*success=*/false);
             return;
         }
+
+        // Any response that made it through (even error codes) means the
+        // satellite is reachable — count it as a health success.
+        updateSatelliteHealth(prefix, /*success=*/true);
 
         // We want to attempt prefix fixing regardless of response code
         // The resp will not have a json component
@@ -1080,8 +1193,12 @@ class RedfishAggregator
         if ((resp.result() == boost::beast::http::status::too_many_requests) ||
             (resp.result() == boost::beast::http::status::bad_gateway))
         {
+            updateSatelliteHealth(prefix, /*success=*/false);
             return;
         }
+
+        // Any response that made it through means the satellite is reachable.
+        updateSatelliteHealth(prefix, /*success=*/true);
 
         if (resp.resultInt() != 200)
         {
@@ -1212,8 +1329,12 @@ class RedfishAggregator
         if ((resp.result() == boost::beast::http::status::too_many_requests) ||
             (resp.result() == boost::beast::http::status::bad_gateway))
         {
+            updateSatelliteHealth(prefix, /*success=*/false);
             return;
         }
+
+        // Any response that made it through means the satellite is reachable.
+        updateSatelliteHealth(prefix, /*success=*/true);
 
         if (resp.resultInt() != 200)
         {

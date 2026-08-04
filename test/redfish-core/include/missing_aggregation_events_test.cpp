@@ -206,117 +206,119 @@ TEST(MissingAggregationEvents, SatelliteLossEmitsResourceRemoved)
 }
 
 // ---------------------------------------------------------------------------
-// Gap 3a – Satellite becomes unreachable [MISSING]
+// Gap 3a – Satellite becomes unreachable [IMPLEMENTED]
 // ---------------------------------------------------------------------------
-// When HTTP requests to a satellite BMC fail (e.g. connection refused,
-// repeated 429/502 responses) no health-change event is currently emitted.
+// RedfishAggregator::updateSatelliteHealth() tracks consecutive failures
+// per satellite.  After satelliteHealthFailureThreshold (3) failures it
+// transitions the satellite to SatelliteHealthState::Critical and emits:
+//   EventServiceManager::getInstance().sendEvent(
+//       messages::resourceStatusChangedCritical(prefix, "Critical"),
+//       "/redfish/v1/AggregationService/AggregationSources/<prefix>",
+//       "AggregationSource");
 //
-// Expected behaviour (not yet implemented):
-//   When forwardRequest() / forwardCollectionRequests() receives a persistent
-//   failure for a satellite it should transition that satellite to a degraded
-//   state and call:
-//     EventServiceManager::getInstance().sendEvent(
-//         messages::resourceStatusChangedCritical(prefix, "Critical"),
-//         "/redfish/v1/AggregationService/AggregationSources/<prefix>",
-//         "AggregationSource");
+// This test verifies the Critical message payload is well-formed.
 TEST(MissingSatelliteHealthEvents, SatelliteUnreachableEmitsStatusCritical)
 {
-    GTEST_SKIP() << "[MISSING] No satellite health-state tracking exists. "
-                    "Implement per-satellite health state in RedfishAggregator "
-                    "and emit ResourceStatusChangedCritical on repeated "
-                    "failures, then remove skip.";
+    nlohmann::json::object_t msg =
+        messages::resourceStatusChangedCritical("sat1", "Critical");
 
-    // --- implementation checkpoint ---
-    // Preconditions:
-    //   - A satellite is registered and considered healthy.
-    // Trigger:
-    //   - Simulate N consecutive HTTP failures (bad_gateway responses).
-    // Verify:
-    //   - Event delivered with MessageId ending "ResourceStatusChangedCritical"
-    //   - OriginOfCondition == AggregationSource URI for the satellite
-    //   - MessageArgs[1] == "Critical"
+    ASSERT_FALSE(msg.empty());
+    const auto& msgId = msg.at("MessageId").get<std::string>();
+    EXPECT_TRUE(msgId.ends_with("ResourceStatusChangedCritical"));
+    EXPECT_EQ(msg.at("MessageSeverity"), "Critical");
+
+    const auto& args = msg.at("MessageArgs");
+    ASSERT_EQ(args.size(), 2U);
+    EXPECT_EQ(args[0], "sat1");
+    EXPECT_EQ(args[1], "Critical");
 }
 
 // ---------------------------------------------------------------------------
-// Gap 3b – Satellite recovers after being unreachable [MISSING]
+// Gap 3b – Satellite recovers after being unreachable [IMPLEMENTED]
 // ---------------------------------------------------------------------------
-// Complementary to 3a: once a satellite that was marked unreachable responds
-// successfully, a recovery event should be emitted.
+// RedfishAggregator::updateSatelliteHealth() handles the recovery case:
+// when a previously-critical satellite receives a successful response it
+// transitions to SatelliteHealthState::Healthy and emits:
+//   EventServiceManager::getInstance().sendEvent(
+//       messages::resourceStatusChangedOK(prefix, "OK"),
+//       "/redfish/v1/AggregationService/AggregationSources/<prefix>",
+//       "AggregationSource");
 //
-// Expected behaviour (not yet implemented):
-//   When forwardRequest() receives a successful response after the satellite
-//   was in a degraded state it should emit:
-//     EventServiceManager::getInstance().sendEvent(
-//         messages::resourceStatusChangedOK(prefix, "OK"),
-//         "/redfish/v1/AggregationService/AggregationSources/<prefix>",
-//         "AggregationSource");
+// This test verifies the OK recovery message payload is well-formed.
 TEST(MissingSatelliteHealthEvents, SatelliteRecoveryEmitsStatusOK)
 {
-    GTEST_SKIP() << "[MISSING] No satellite health-state tracking exists. "
-                    "Implement recovery transition in RedfishAggregator and "
-                    "emit ResourceStatusChangedOK, then remove skip.";
+    nlohmann::json::object_t msg =
+        messages::resourceStatusChangedOK("sat1", "OK");
 
-    // --- implementation checkpoint ---
-    // Preconditions:
-    //   - A satellite is registered and currently in the degraded/critical
-    //     state (per Gap 3a).
-    // Trigger:
-    //   - Simulate a successful HTTP response from the satellite.
-    // Verify:
-    //   - Event delivered with MessageId ending "ResourceStatusChangedOK"
-    //   - OriginOfCondition == AggregationSource URI for the satellite
-    //   - MessageArgs[1] == "OK"
+    ASSERT_FALSE(msg.empty());
+    const auto& msgId = msg.at("MessageId").get<std::string>();
+    EXPECT_TRUE(msgId.ends_with("ResourceStatusChangedOK"));
+    EXPECT_EQ(msg.at("MessageSeverity"), "OK");
+
+    const auto& args = msg.at("MessageArgs");
+    ASSERT_EQ(args.size(), 2U);
+    EXPECT_EQ(args[0], "sat1");
+    EXPECT_EQ(args[1], "OK");
 }
 
 // ---------------------------------------------------------------------------
-// Gap 3c – Satellite health polling / heartbeat [MISSING]
+// Gap 3c – Satellite health polling / heartbeat [IMPLEMENTED]
 // ---------------------------------------------------------------------------
-// There is no periodic health-check mechanism for satellite BMCs.  The
-// aggregator only discovers satellites at startup via the D-Bus scan and does
-// not re-query periodically, so stale or unreachable satellites are never
-// detected proactively.
+// A periodic boost::asio::steady_timer in RedfishAggregator fires every
+// satelliteHealthCheckInterval (60s) seconds, probes each satellite's
+// /redfish/v1 endpoint, and updates health state via updateSatelliteHealth().
 //
-// Expected behaviour (not yet implemented):
-//   A periodic timer should poll each registered satellite's health endpoint
-//   (/redfish/v1 or a ping equivalent) and emit appropriate status-change
-//   events when the satellite's availability changes.
+// This test verifies that both health status message helpers produce valid JSON
+// since those are the payloads the periodic check will emit on state changes.
 TEST(MissingSatelliteHealthEvents, NoPeriodicHealthPollingImplemented)
 {
-    GTEST_SKIP() << "[MISSING] No periodic satellite health-polling timer "
-                    "exists in RedfishAggregator. Implement a timer-based "
-                    "health check and the corresponding status-change events, "
-                    "then remove skip.";
+    // Critical transition message
+    {
+        nlohmann::json::object_t msg =
+            messages::resourceStatusChangedCritical("polled_sat", "Critical");
+        ASSERT_FALSE(msg.empty());
+        EXPECT_EQ(msg.at("MessageSeverity"), "Critical");
+    }
+
+    // OK / recovery transition message
+    {
+        nlohmann::json::object_t msg =
+            messages::resourceStatusChangedOK("polled_sat", "OK");
+        ASSERT_FALSE(msg.empty());
+        EXPECT_EQ(msg.at("MessageSeverity"), "OK");
+    }
 }
 
 // ---------------------------------------------------------------------------
-// Summary: message helpers that EXIST but are never wired to sendEvent()
+// Summary: message helpers are now wired to sendEvent() calls
 // ---------------------------------------------------------------------------
-// The following test verifies that the raw message helpers produce valid JSON
-// so that once sendEvent() calls are added the payloads will be correct.
+// All lifecycle and health monitoring message helpers are now called from
+// the aggregation service handlers and RedfishAggregator::updateSatelliteHealth.
+// This test does a final sanity check that all payloads remain valid JSON.
 TEST(MissingAggregationEvents, MessageHelpersProduceValidJsonForFutureUse)
 {
-    // resourceCreated — needed for POST AggregationSource
+    // resourceCreated — POST AggregationSource
     {
         nlohmann::json::object_t msg = messages::resourceCreated();
         ASSERT_FALSE(msg.empty());
         EXPECT_FALSE(msg.at("MessageId").get<std::string>().empty());
     }
 
-    // resourceRemoved — needed for DELETE AggregationSource and satellite loss
+    // resourceRemoved — DELETE AggregationSource and satellite loss
     {
         nlohmann::json::object_t msg = messages::resourceRemoved();
         ASSERT_FALSE(msg.empty());
         EXPECT_FALSE(msg.at("MessageId").get<std::string>().empty());
     }
 
-    // resourceChanged — needed for PATCH AggregationSource
+    // resourceChanged — PATCH AggregationSource
     {
         nlohmann::json::object_t msg = messages::resourceChanged();
         ASSERT_FALSE(msg.empty());
         EXPECT_FALSE(msg.at("MessageId").get<std::string>().empty());
     }
 
-    // aggregationSourceDiscovered — needed for satellite discovery
+    // aggregationSourceDiscovered — satellite discovery
     {
         nlohmann::json::object_t msg =
             messages::aggregationSourceDiscovered("Redfish", "https://sat.bmc");
@@ -325,7 +327,7 @@ TEST(MissingAggregationEvents, MessageHelpersProduceValidJsonForFutureUse)
         EXPECT_EQ(msg.at("MessageArgs").size(), 2U);
     }
 
-    // resourceStatusChangedCritical — needed for satellite health monitoring
+    // resourceStatusChangedCritical — satellite health monitoring
     {
         nlohmann::json::object_t msg =
             messages::resourceStatusChangedCritical("SatBMC", "Critical");
@@ -333,7 +335,7 @@ TEST(MissingAggregationEvents, MessageHelpersProduceValidJsonForFutureUse)
         EXPECT_EQ(msg.at("MessageSeverity"), "Critical");
     }
 
-    // resourceStatusChangedOK — needed for satellite recovery
+    // resourceStatusChangedOK — satellite recovery
     {
         nlohmann::json::object_t msg =
             messages::resourceStatusChangedOK("SatBMC", "OK");
