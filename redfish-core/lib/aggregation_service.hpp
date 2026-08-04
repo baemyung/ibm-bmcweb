@@ -5,6 +5,7 @@
 #include "app.hpp"
 #include "async_resp.hpp"
 #include "error_messages.hpp"
+#include "event_service_manager.hpp"
 #include "http_request.hpp"
 #include "http_response.hpp"
 #include "logging.hpp"
@@ -12,6 +13,7 @@
 #include "query.hpp"
 #include "redfish_aggregator.hpp"
 #include "registries/privilege_registry.hpp"
+#include "resource_messages.hpp"
 #include "utility.hpp"
 #include "utils/json_utils.hpp"
 
@@ -334,10 +336,22 @@ inline void handleAggregationSourceCollectionPost(
         AggregationSource{*url, username.value_or(""), password.value_or("")});
 
     BMCWEB_LOG_DEBUG("Emplaced {} with url {}", prefix, url->buffer());
-    asyncResp->res.addHeader(
-        boost::beast::http::field::location,
-        boost::urls::format("/redfish/v1/AggregationSources/{}", prefix)
-            .buffer());
+
+    std::string aggregationSourceUri =
+        boost::urls::format(
+            "/redfish/v1/AggregationService/AggregationSources/{}", prefix)
+            .buffer();
+    asyncResp->res.addHeader(boost::beast::http::field::location,
+                             aggregationSourceUri);
+
+    // Notify event subscribers about the new AggregationSource.
+    EventServiceManager::getInstance().sendEvent(
+        messages::aggregationSourceDiscovered("Redfish", url->buffer()),
+        aggregationSourceUri, "AggregationSource");
+    EventServiceManager::getInstance().sendEvent(messages::resourceCreated(),
+                                                 aggregationSourceUri,
+                                                 "AggregationSource");
+
     messages::created(asyncResp->res);
 }
 
@@ -384,6 +398,16 @@ inline void handleAggregationSourcePatch(
         {
             it->second.password = *password;
         }
+
+        // Notify event subscribers about the updated AggregationSource.
+        std::string aggregationSourceUri =
+            boost::urls::format(
+                "/redfish/v1/AggregationService/AggregationSources/{}",
+                aggregationSourceId)
+                .buffer();
+        EventServiceManager::getInstance().sendEvent(
+            messages::resourceChanged(), aggregationSourceUri,
+            "AggregationSource");
 
         messages::success(asyncResp->res);
         return;
@@ -438,6 +462,18 @@ inline void handleAggregationSourceDelete(
                                    aggregationSourceId);
         return;
     }
+
+    // Notify event subscribers that the AggregationSource was removed.
+    // The event is sent before the response so that the URI is still meaningful
+    // to any subscriber that immediately re-queries the collection.
+    std::string aggregationSourceUri =
+        boost::urls::format(
+            "/redfish/v1/AggregationService/AggregationSources/{}",
+            aggregationSourceId)
+            .buffer();
+    EventServiceManager::getInstance().sendEvent(messages::resourceRemoved(),
+                                                 aggregationSourceUri,
+                                                 "AggregationSource");
 
     messages::success(asyncResp->res);
 }
