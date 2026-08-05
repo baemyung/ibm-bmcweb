@@ -1,3 +1,5 @@
+#include "bmcweb_config.h"
+
 #include "dbus_singleton.hpp"
 #include "logging.hpp"
 
@@ -37,6 +39,7 @@ static std::shared_ptr<sdbusplus::bus::match::match> matchEventLogCreated;
 static std::shared_ptr<sdbusplus::bus::match::match> matchPostCodeChange;
 static std::shared_ptr<sdbusplus::bus::match::match> matchPlatformSAIChange;
 static std::shared_ptr<sdbusplus::bus::match::match> matchPartitionSAIChange;
+static std::shared_ptr<sdbusplus::bus::match::match> matchBMCRedundancyChange;
 
 static uint64_t postCodeCounter = 0;
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
@@ -55,6 +58,7 @@ void registerPostCodeChangeSignal();
 void registerSAIStateChangeSignal();
 void registerDumpUpdateSignal();
 void registerStateChangeSignal();
+void registerBMCRedundancyChangeSignal();
 void registerVMIConfigChangeSignal();
 
 inline void sendEventOnEthIntf(const std::string& origin)
@@ -381,11 +385,110 @@ inline void registerEventLogCreatedSignal()
         eventLogCreatedSignal);
 }
 
+// Emits ResourceChanged (or a more specific status event) for the Manager
+// resource when any property on xyz.openbmc_project.State.BMC.Redundancy
+// changes.  Covers gaps R1/R3/R4/R5 described in
+// test/redfish-core/include/missing_redundancy_events_test.cpp.
+inline void bmcRedundancyPropertyChange(sdbusplus::message::message& msg)
+{
+    BMCWEB_LOG_DEBUG("BMC redundancy state change match fired");
+
+    if (msg.is_method_error())
+    {
+        BMCWEB_LOG_ERROR("BMC Redundancy property changed Signal error");
+        return;
+    }
+
+    boost::container::flat_map<std::string,
+                               std::variant<std::string, bool, size_t>>
+        values;
+    std::string objName;
+    msg.read(objName, values);
+
+    // FailoversAllowed false → true: health improves to OK
+    auto failoverIt = values.find("FailoversAllowed");
+    if (failoverIt != values.end())
+    {
+        const bool* allowed = std::get_if<bool>(&failoverIt->second);
+        if (allowed != nullptr)
+        {
+            std::string origin = std::format("/redfish/v1/Managers/{}",
+                                             BMCWEB_REDFISH_MANAGER_URI_NAME);
+            if (*allowed)
+            {
+                redfish::EventServiceManager::getInstance().sendEvent(
+                    redfish::messages::resourceStatusChangedOK(
+                        BMCWEB_REDFISH_MANAGER_URI_NAME, "OK"),
+                    origin, "Manager");
+            }
+            else
+            {
+                redfish::EventServiceManager::getInstance().sendEvent(
+                    redfish::messages::resourceStatusChangedWarning(
+                        BMCWEB_REDFISH_MANAGER_URI_NAME, "Warning"),
+                    origin, "Manager");
+            }
+            return;
+        }
+    }
+
+    // Role change (Standby ↔ Active): emit ResourceStateChanged so
+    // subscribers know the ActiveRedundancySet has changed.
+    auto roleIt = values.find("Role");
+    if (roleIt != values.end())
+    {
+        const std::string* role = std::get_if<std::string>(&roleIt->second);
+        if (role != nullptr)
+        {
+            std::string_view roleLabel = "Standby";
+            if (*role ==
+                "xyz.openbmc_project.State.BMC.Redundancy.Role.Active")
+            {
+                roleLabel = "Active";
+            }
+            std::string origin = std::format("/redfish/v1/Managers/{}",
+                                             BMCWEB_REDFISH_MANAGER_URI_NAME);
+            redfish::EventServiceManager::getInstance().sendEvent(
+                redfish::messages::resourceStateChanged(
+                    BMCWEB_REDFISH_MANAGER_URI_NAME, roleLabel),
+                origin, "Manager");
+            return;
+        }
+    }
+
+    // Any other property change (RedundancyEnabled, counts, etc.):
+    // emit a generic ResourceChanged so subscribers can re-query.
+    std::string origin = std::format("/redfish/v1/Managers/{}",
+                                     BMCWEB_REDFISH_MANAGER_URI_NAME);
+    redfish::EventServiceManager::getInstance().sendEvent(
+        redfish::messages::resourceChanged(), origin, "Manager");
+}
+
+inline void registerBMCRedundancyChangeSignal()
+{
+    if constexpr (!BMCWEB_EXPERIMENTAL_REDFISH_REDUNDANT_MANAGER)
+    {
+        return;
+    }
+
+    BMCWEB_LOG_DEBUG("BMC redundancy state change signal - Register");
+
+    matchBMCRedundancyChange =
+        std::make_unique<sdbusplus::bus::match::match>(
+            *crow::connections::systemBus,
+            "type='signal',member='PropertiesChanged',"
+            "interface='org.freedesktop.DBus.Properties',"
+            "path='/xyz/openbmc_project/state/bmc0',"
+            "arg0='xyz.openbmc_project.State.BMC.Redundancy'",
+            bmcRedundancyPropertyChange);
+}
+
 inline void registerStateChangeSignal()
 {
     registerHostStateChangeSignal();
     registerBMCStateChangeSignal();
     registerBootProgressChangeSignal();
+    registerBMCRedundancyChangeSignal();
 }
 
 inline void registerVMIConfigChangeSignal()
