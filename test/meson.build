@@ -34,6 +34,8 @@ srcfiles_unittest = files(
     'redfish-core/include/redfish_test.cpp',
     'redfish-core/include/registries_test.cpp',
     'redfish-core/include/submit_test_event_test.cpp',
+    'redfish-core/include/manager_redundancy_event_integration_test.cpp',
+    'redfish-core/include/missing_redundancy_events_test.cpp',
     'redfish-core/include/utils/dbus_utils.cpp',
     'redfish-core/include/utils/error_code_test.cpp',
     'redfish-core/include/utils/hex_utils_test.cpp',
