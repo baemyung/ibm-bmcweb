@@ -7,10 +7,12 @@
 #include "dbus_singleton.hpp"
 #include "dbus_utility.hpp"
 #include "error_messages.hpp"
+#include "event_service_manager.hpp"
 #include "generated/enums/redundancy.hpp"
 #include "generated/enums/resource.hpp"
 #include "logging.hpp"
 #include "query.hpp"
+#include "resource_messages.hpp"
 #include "utils/dbus_utils.hpp"
 
 #include <asm-generic/errno.h>
@@ -317,8 +319,8 @@ inline void handleManagerForceFailover(
         "xyz.openbmc_project.Control.Failover";
 
     crow::connections::systemBus->async_method_call(
-        [asyncResp](const boost::system::error_code& ec,
-                    const sdbusplus::message_t& msg) {
+        [asyncResp, managerId](const boost::system::error_code& ec,
+                               const sdbusplus::message_t& msg) {
             if (ec)
             {
                 const sd_bus_error* dbusError = msg.get_error();
@@ -336,6 +338,12 @@ inline void handleManagerForceFailover(
                 messages::internalError(asyncResp->res);
                 return;
             }
+            // Notify subscribers that the Manager resource has changed due
+            // to a successful failover (Gap R2).
+            std::string origin =
+                std::format("/redfish/v1/Managers/{}", managerId);
+            EventServiceManager::getInstance().sendEvent(
+                messages::resourceChanged(), origin, "Manager");
             messages::success(asyncResp->res);
         },
         service, objectPath, interfaceName, "StartFailover", requester,
