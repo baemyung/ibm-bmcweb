@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manager Redundancy Event Service – Gap Analysis and Implementation</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #1f2328;
+      background: #ffffff;
+      padding: 32px 24px;
+    }
+    .page { max-width: 900px; margin: 0 auto; }
+
+    h1 { font-size: 26px; border-bottom: 3px solid #7c5cd8; padding-bottom: 10px; margin-bottom: 6px; }
+    h2 { font-size: 18px; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px;
+         margin-top: 32px; margin-bottom: 12px; color: #1f2328; }
+    h3 { font-size: 14px; font-weight: 600; margin-top: 18px; margin-bottom: 8px; color: #1f2328; }
+    p  { margin: 8px 0; color: #1f2328; }
+
+    .branch-badge {
+      display: inline-block;
+      background: #ede9fe; color: #6d28d9;
+      font-family: 'Courier New', monospace; font-size: 12px; font-weight: 600;
+      padding: 3px 10px; border-radius: 20px; margin-bottom: 20px;
+    }
+
+    /* tables */
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+    th    { background: #e5e7eb; padding: 9px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #d0d7de; }
+    td    { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    tr:hover td { background: #f7f8fa; }
+    td code, th code { font-family: 'Courier New', monospace; font-size: 11px;
+                       background: #e5e7eb; padding: 1px 5px; border-radius: 3px; }
+
+    /* status pills */
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 3px;
+            font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .pill-miss   { background: #fee2e2; color: #991b1b; }
+    .pill-fixed  { background: #dcfce7; color: #166534; }
+    .pill-future { background: #fef3c7; color: #92400e; }
+    .pill-exist  { background: #dbeafe; color: #1e40af; }
+
+    /* gap-id */
+    .gid { font-family: 'Courier New', monospace; font-weight: 700; color: #dc2626; }
+
+    /* code blocks */
+    pre  { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 6px;
+           padding: 14px; overflow-x: auto; margin: 10px 0; }
+    pre code { font-family: 'Courier New', monospace; font-size: 12px;
+               background: none; padding: 0; border-radius: 0; color: #1f2328; }
+    code { font-family: 'Courier New', monospace; font-size: 12px;
+           background: #e5e7eb; padding: 1px 5px; border-radius: 3px; }
+
+    /* callout boxes */
+    .callout { border-left: 4px solid; border-radius: 4px; padding: 12px 14px; margin: 12px 0; }
+    .callout-info    { border-color: #7c5cd8; background: #f5f3ff; }
+    .callout-warn    { border-color: #f59e0b; background: #fffbeb; }
+    .callout-success { border-color: #16a34a; background: #f0fdf4; }
+
+    /* section separator */
+    hr { border: none; border-top: 1px solid #e5e7eb; margin: 28px 0; }
+
+    /* coverage matrix checkmarks */
+    .ok { color: #16a34a; font-weight: 700; }
+    .todo { color: #f59e0b; font-weight: 700; }
+
+    /* comparison table at bottom */
+    .cmp-table th { background: #ede9fe; }
+
+    ul { margin: 8px 0 8px 22px; }
+    ol { margin: 8px 0 8px 22px; }
+    li { margin: 4px 0; }
+
+    .footer {
+      text-align: center; margin-top: 40px; padding-top: 18px;
+      border-top: 1px solid #e5e7eb; font-size: 12px; color: #57606a;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Manager Redundancy Event Service</h1>
+  <h2 style="border:none;margin-top:4px;font-size:15px;color:#57606a;font-weight:400;">
+    Gap Analysis and Implementation
+  </h2>
+  <div class="branch-badge">1210-eventing-for-redundant-manager</div>
+
+  <hr>
+
+  <!-- 1. Background -->
+  <h2>1. Background</h2>
+  <p>
+    bmcweb exposes Manager Redundancy state through
+    <code>GET /redfish/v1/Managers/{id}</code> when
+    <code>BMCWEB_EXPERIMENTAL_REDFISH_REDUNDANT_MANAGER=true</code>.
+    The data is read live from the D-Bus interface
+    <code>xyz.openbmc_project.State.BMC.Redundancy</code> on object
+    <code>/xyz/openbmc_project/state/bmc0</code>.
+  </p>
+  <p>
+    The <code>ForceFailover</code> action
+    (<code>POST …/Actions/Manager.ForceFailover</code>) calls the D-Bus method
+    <code>xyz.openbmc_project.Control.Failover.StartFailover</code>.
+  </p>
+  <div class="callout callout-warn">
+    Before this branch <strong>none</strong> of the redundancy property changes
+    triggered a Redfish event to EventService subscribers.
+  </div>
+
+  <hr>
+
+  <!-- 2. Property Mapping -->
+  <h2>2. D-Bus → Redfish Property Mapping</h2>
+  <table>
+    <thead>
+      <tr><th>D-Bus Property</th><th>Redfish Field</th><th>Type</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>RedundancyEnabled</code></td><td><code>Redundancy[].Mode</code></td><td><code>Failover</code> / <code>NotRedundant</code></td></tr>
+      <tr><td><code>FailoversAllowed</code></td><td><code>Redundancy[].Status.State</code></td><td><code>Enabled</code> / <code>Disabled</code></td></tr>
+      <tr><td><code>FailoversAllowed</code></td><td><code>Redundancy[].Status.Health</code></td><td><code>OK</code> / <code>Warning</code></td></tr>
+      <tr><td><code>RedundancyMinimum</code></td><td><code>MinNumNeededForFaultTolerance</code></td><td>integer</td></tr>
+      <tr><td><code>RedundancyMaximum</code></td><td><code>MaxNumSupported</code></td><td>integer</td></tr>
+      <tr><td><code>FunctionalMinimum</code></td><td><code>MinNumNeeded</code></td><td>integer</td></tr>
+      <tr><td><code>Role</code></td><td><code>ActiveRedundancySet[]</code></td><td>member link (Active only)</td></tr>
+    </tbody>
+  </table>
+
+  <hr>
+
+  <!-- 3. Gap Inventory -->
+  <h2>3. Event Gap Inventory</h2>
+
+  <h3>3.1 Gaps Before This Branch</h3>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Trigger</th><th>Expected Event</th><th>Status Before</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="gid">R1</span></td>
+        <td>Any property changes on <code>xyz.openbmc_project.State.BMC.Redundancy</code></td>
+        <td><code>ResourceEvent.ResourceChanged</code> for Manager</td>
+        <td><span class="pill pill-miss">MISSING</span></td>
+      </tr>
+      <tr>
+        <td><span class="gid">R2</span></td>
+        <td><code>ForceFailover</code> action succeeds</td>
+        <td><code>ResourceEvent.ResourceChanged</code> for Manager</td>
+        <td><span class="pill pill-miss">MISSING</span></td>
+      </tr>
+      <tr>
+        <td><span class="gid">R3</span></td>
+        <td><code>RedundancyEnabled</code> flips</td>
+        <td><code>ResourceEvent.ResourceChanged</code> (Mode change)</td>
+        <td><span class="pill pill-miss">MISSING</span> (via R1)</td>
+      </tr>
+      <tr>
+        <td><span class="gid">R4a</span></td>
+        <td><code>FailoversAllowed</code> becomes <code>true</code></td>
+        <td><code>ResourceEvent.ResourceStatusChangedOK</code></td>
+        <td><span class="pill pill-miss">MISSING</span> (via R1)</td>
+      </tr>
+      <tr>
+        <td><span class="gid">R4b</span></td>
+        <td><code>FailoversAllowed</code> becomes <code>false</code></td>
+        <td><code>ResourceEvent.ResourceStatusChangedWarning</code></td>
+        <td><span class="pill pill-miss">MISSING</span> (via R1)</td>
+      </tr>
+      <tr>
+        <td><span class="gid">R5</span></td>
+        <td><code>Role</code> changes Standby↔Active</td>
+        <td><code>ResourceEvent.ResourceStateChanged</code></td>
+        <td><span class="pill pill-miss">MISSING</span> (via R1)</td>
+      </tr>
+      <tr>
+        <td><span class="gid">R6</span></td>
+        <td>Sibling BMC object added/removed from D-Bus subtree</td>
+        <td><code>ResourceEvent.ResourceChanged</code></td>
+        <td><span class="pill pill-future">FUTURE WORK</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>3.2 Coverage That Already Existed</h3>
+  <table>
+    <thead>
+      <tr><th>Area</th><th>Signal / Path</th><th>Event</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>BMC general state</td>
+        <td><code>xyz.openbmc_project.State.BMC</code> on <code>/xyz/openbmc_project/state/bmc0</code></td>
+        <td><span class="pill pill-exist">ResourceChanged</span> for Manager</td>
+      </tr>
+      <tr>
+        <td>Host state</td>
+        <td><code>xyz.openbmc_project.State.Host</code> on <code>/xyz/openbmc_project/state/host0</code></td>
+        <td><span class="pill pill-exist">ResourceChanged</span> for ComputerSystem</td>
+      </tr>
+      <tr>
+        <td>Boot progress</td>
+        <td><code>xyz.openbmc_project.State.Boot.Progress</code></td>
+        <td><span class="pill pill-exist">ResourceChanged</span> for ComputerSystem</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr>
+
+  <!-- 4. Implemented Fixes -->
+  <h2>4. Implemented Fixes (STEP C)</h2>
+
+  <h3>4.1 <code>include/event_dbus_monitor.hpp</code></h3>
+  <p>Four additions:</p>
+  <ol>
+    <li>
+      <strong><code>matchBMCRedundancyChange</code></strong> — static
+      <code>shared_ptr&lt;sdbusplus::bus::match::match&gt;</code> (Gap R1)
+    </li>
+    <li>
+      <strong><code>bmcRedundancyPropertyChange()</code></strong> — signal handler
+      with three dispatch branches:
+      <ul>
+        <li><code>FailoversAllowed = true</code> → <code>sendEvent(resourceStatusChangedOK(…))</code></li>
+        <li><code>FailoversAllowed = false</code> → <code>sendEvent(resourceStatusChangedWarning(…))</code></li>
+        <li><code>Role</code> changes → <code>sendEvent(resourceStateChanged(…))</code></li>
+        <li>Any other property → <code>sendEvent(resourceChanged())</code> (covers R3)</li>
+      </ul>
+    </li>
+    <li>
+      <strong><code>registerBMCRedundancyChangeSignal()</code></strong> — registers the D-Bus
+      match on:
+      <pre><code>type='signal',member='PropertiesChanged',
+interface='org.freedesktop.DBus.Properties',
+path='/xyz/openbmc_project/state/bmc0',
+arg0='xyz.openbmc_project.State.BMC.Redundancy'</code></pre>
+      Guarded by <code>if constexpr (BMCWEB_EXPERIMENTAL_REDFISH_REDUNDANT_MANAGER)</code>
+      so the match is only created when the feature is enabled.
+    </li>
+    <li>
+      <strong><code>registerStateChangeSignal()</code></strong> — now calls
+      <code>registerBMCRedundancyChangeSignal()</code> after the existing
+      host / BMC / boot-progress registrations.
+    </li>
+  </ol>
+
+  <h3>4.2 <code>redfish-core/include/manager_redundancy.hpp</code></h3>
+  <p>
+    Added <code>sendEvent(messages::resourceChanged(), origin, "Manager")</code> inside
+    the success branch of <code>handleManagerForceFailover()</code>'s async callback
+    (Gap R2). The <code>managerId</code> parameter is now captured in the lambda to
+    construct the origin URI.
+  </p>
+
+  <hr>
+
+  <!-- 5. Remaining Gaps -->
+  <h2>5. Remaining Gaps (Future Work)</h2>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Description</th><th>Implementation Hint</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="gid">R6</span></td>
+        <td>Sibling BMC added/removed from redundancy subtree</td>
+        <td>
+          Register <code>InterfacesAdded</code> / <code>InterfacesRemoved</code> on
+          <code>/xyz/openbmc_project/state</code> for
+          <code>xyz.openbmc_project.State.BMC.Redundancy</code>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr>
+
+  <!-- 6. Test Files -->
+  <h2>6. Test Files Created</h2>
+
+  <h3>STEP A – Unit Tests</h3>
+  <table>
+    <thead>
+      <tr><th>File</th><th>Tests</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>test/redfish-core/include/missing_redundancy_events_test.cpp</code></td>
+        <td>20</td>
+        <td>Document covered/missing gaps; lock helper payloads</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Tests are grouped:</p>
+  <ul>
+    <li><code>ManagerRedundancyCovered</code> – 6 tests locking existing D-Bus→Redfish enum mapping</li>
+    <li><code>ManagerRedundancyMissing</code> – 14 tests; R1–R5 now implemented and green; R6 still skipped</li>
+  </ul>
+
+  <h3>STEP B – Integration Tests</h3>
+  <table>
+    <thead>
+      <tr><th>File</th><th>Tests</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>test/redfish-core/include/manager_redundancy_event_integration_test.cpp</code></td>
+        <td>15</td>
+        <td>EventService filter routing for Manager redundancy events</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Tests are grouped:</p>
+  <ul>
+    <li><code>ManagerRedundancyIntegration</code> – 9 green tests covering filter routing</li>
+    <li><code>ManagerRedundancyIntegrationPlaceholder</code> – 6 tests; R1/R2/R4a/R4b/R5 now green; R6 still skipped</li>
+  </ul>
+
+  <h3>STEP B – E2E Script</h3>
+  <table>
+    <thead>
+      <tr><th>File</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>scripts/test-manager-redundancy-events-e2e.sh</code></td>
+        <td>curl-based HTTP E2E suite with gap-analysis command</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr>
+
+  <!-- 7. Build Integration -->
+  <h2>7. Build Integration</h2>
+  <p>New test files registered in <code>test/meson.build</code>:</p>
+  <pre><code>'redfish-core/include/missing_redundancy_events_test.cpp',
+'redfish-core/include/manager_redundancy_event_integration_test.cpp',</code></pre>
+
+  <hr>
+
+  <!-- 8. Coverage Matrix -->
+  <h2>8. Event Coverage Matrix (After This Branch)</h2>
+  <table>
+    <thead>
+      <tr><th>Trigger</th><th>Message</th><th>Origin</th><th>Resource Type</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>FailoversAllowed</code> → <code>true</code></td>
+        <td><code>ResourceStatusChangedOK</code></td>
+        <td><code>/redfish/v1/Managers/{id}</code></td>
+        <td><code>Manager</code></td>
+        <td><span class="ok">✅</span> Implemented</td>
+      </tr>
+      <tr>
+        <td><code>FailoversAllowed</code> → <code>false</code></td>
+        <td><code>ResourceStatusChangedWarning</code></td>
+        <td><code>/redfish/v1/Managers/{id}</code></td>
+        <td><code>Manager</code></td>
+        <td><span class="ok">✅</span> Implemented</td>
+      </tr>
+      <tr>
+        <td><code>Role</code> → Active/Standby</td>
+        <td><code>ResourceStateChanged</code></td>
+        <td><code>/redfish/v1/Managers/{id}</code></td>
+        <td><code>Manager</code></td>
+        <td><span class="ok">✅</span> Implemented</td>
+      </tr>
+      <tr>
+        <td>Any other <code>BMC.Redundancy</code> prop</td>
+        <td><code>ResourceChanged</code></td>
+        <td><code>/redfish/v1/Managers/{id}</code></td>
+        <td><code>Manager</code></td>
+        <td><span class="ok">✅</span> Implemented</td>
+      </tr>
+      <tr>
+        <td><code>ForceFailover</code> success</td>
+        <td><code>ResourceChanged</code></td>
+        <td><code>/redfish/v1/Managers/{id}</code></td>
+        <td><code>Manager</code></td>
+        <td><span class="ok">✅</span> Implemented</td>
+      </tr>
+      <tr>
+        <td>Sibling BMC appears/disappears</td>
+        <td><code>ResourceChanged</code></td>
+        <td><code>/redfish/v1/Managers/{id}</code></td>
+        <td><code>Manager</code></td>
+        <td><span class="todo">📋</span> Future (R6)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr>
+
+  <!-- 9. Subscriber Examples -->
+  <h2>9. Subscriber Filter Examples</h2>
+
+  <h3>Subscribe to all Manager redundancy events</h3>
+  <pre><code>{
+  "Destination": "https://listener.example.com/events",
+  "EventFormatType": "Event",
+  "ResourceTypes": ["Manager"],
+  "RegistryPrefixes": ["ResourceEvent"]
+}</code></pre>
+
+  <h3>Subscribe to health-change events only</h3>
+  <p>Use <code>MessageIds</code> filter:</p>
+  <pre><code>{
+  "Destination": "https://listener.example.com/events",
+  "EventFormatType": "Event",
+  "MessageIds": [
+    "ResourceEvent.1.3.ResourceStatusChangedOK",
+    "ResourceEvent.1.3.ResourceStatusChangedWarning"
+  ]
+}</code></pre>
+
+  <h3>Subscribe to a specific Manager's redundancy events</h3>
+  <pre><code>{
+  "Destination": "https://listener.example.com/events",
+  "EventFormatType": "Event",
+  "OriginResources": [
+    { "@odata.id": "/redfish/v1/Managers/bmc" }
+  ]
+}</code></pre>
+
+  <hr>
+
+  <!-- 10. Running Tests -->
+  <h2>10. Running Tests</h2>
+  <pre><code># Build
+cd build &amp;&amp; ninja
+
+# STEP A unit tests
+meson test missing_redundancy_events_test -v
+
+# STEP B integration tests
+meson test manager_redundancy_event_integration_test -v
+
+# E2E gap analysis (no running BMC needed)
+./scripts/test-manager-redundancy-events-e2e.sh gap-analysis
+
+# E2E full run (requires bmcweb + D-Bus redundancy service + event listener)
+python3 scripts/redfish-event-listener.py --daemon &amp;
+./scripts/test-manager-redundancy-events-e2e.sh full</code></pre>
+
+  <hr>
+
+  <!-- 11. Comparison -->
+  <h2>11. Parallel AggregationService Work</h2>
+  <p>This branch mirrors the structure of the AggregationService eventing work:</p>
+  <table class="cmp-table">
+    <thead>
+      <tr><th></th><th>AggregationService</th><th>Manager Redundancy</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Unit tests (STEP A)</td>
+        <td><code>missing_aggregation_events_test.cpp</code></td>
+        <td><code>missing_redundancy_events_test.cpp</code></td>
+      </tr>
+      <tr>
+        <td>Integration tests (STEP B)</td>
+        <td><code>satellite_event_forwarding_integration_test.cpp</code></td>
+        <td><code>manager_redundancy_event_integration_test.cpp</code></td>
+      </tr>
+      <tr>
+        <td>E2E script (STEP B)</td>
+        <td><code>test-satellite-events-e2e.sh</code></td>
+        <td><code>test-manager-redundancy-events-e2e.sh</code></td>
+      </tr>
+      <tr>
+        <td>Implementation (STEP C)</td>
+        <td><code>aggregation_service.hpp</code>, <code>redfish_aggregator.hpp</code></td>
+        <td><code>event_dbus_monitor.hpp</code>, <code>manager_redundancy.hpp</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Made with IBM Bob &nbsp;·&nbsp;
+    Source: <code>docs/MANAGER-REDUNDANCY-EVENTING.md</code>
+  </div>
+</div>
+</body>
+</html>
