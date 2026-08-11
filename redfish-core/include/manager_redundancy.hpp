@@ -275,25 +275,33 @@ inline void handleManagerForceFailover(
         messages::resourceNotFound(asyncResp->res, "Manager", managerId);
         return;
     }
-
     BMCWEB_LOG_DEBUG("Post Force Failover");
 
-    std::optional<std::string> newManager;
-
+    std::string newManager;
     if (!json_util::readJsonAction(req, asyncResp->res, "NewManager/@odata.id",
                                    newManager))
     {
         return;
     }
 
+    std::string newManagerId;
     boost::system::result<boost::urls::url> parsedUrl =
-        boost::urls::parse_relative_ref(*newManager);
-    if (crow::utility::readUrlSegments(*parsedUrl, "redfish", "v1", "Managers",
-                                       BMCWEB_REDFISH_MANAGER_URI_NAME))
+        boost::urls::parse_relative_ref(newManager);
+
+    if (!crow::utility::readUrlSegments(*parsedUrl, "redfish", "v1", "Managers",
+                                        std::ref(newManagerId)))
     {
         BMCWEB_LOG_WARNING(
-            "Invalid property value for NewManager/@odata.id: {}", *newManager);
-        messages::actionParameterNotSupported(asyncResp->res, *newManager,
+            "Invalid property value for NewManager/@odata.id: {}", newManager);
+        messages::actionParameterNotSupported(asyncResp->res, newManager,
+                                              "ForceFailover");
+        return;
+    }
+    if (newManagerId != BMCWEB_REDFISH_MANAGER_URI_NAME)
+    {
+        BMCWEB_LOG_WARNING(
+            "Invalid property value for NewManager/@odata.id: {}", newManager);
+        messages::actionParameterNotSupported(asyncResp->res, newManager,
                                               "ForceFailover");
         return;
     }
