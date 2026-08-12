@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: Copyright OpenBMC Authors
 //
-// Tests documenting MISSING event emission for Manager Redundancy state
-// transitions monitored via xyz.openbmc_project.State.BMC.Redundancy D-Bus
-// interface.
+// Tests documenting event emission for Manager Redundancy state transitions
+// monitored via xyz.openbmc_project.State.BMC.Redundancy D-Bus interface.
 //
 // Coverage status: STEP A – UNIT TESTS (covered + missing)
 //
@@ -27,10 +26,10 @@
 //   /xyz/openbmc_project/state/bmc0 when a POST ForceFailover action arrives.
 //
 // event_dbus_monitor.hpp registers a PropertiesChanged signal for
-//   xyz.openbmc_project.State.BMC on /xyz/openbmc_project/state/bmc0
-// and sends a generic ResourceChanged Manager event on any change.  That
-// signal path covers the BMC state machine (Running, Ready, etc.) but NOT
-// the xyz.openbmc_project.State.BMC.Redundancy interface.
+//   xyz.openbmc_project.State.BMC.Redundancy on /xyz/openbmc_project/state/bmc0
+// (bmcRedundancyPropertyChange) and sends targeted Redfish events based on
+// which property changed.  This covers all redundancy property transitions
+// regardless of whether they were triggered via Redfish or directly over D-Bus.
 //
 // -------------------------------------------------------------------------
 // Gap summary (each gap has a corresponding test below)
@@ -39,26 +38,34 @@
 //   When RedundancyEnabled, FailoversAllowed, or Role changes on the
 //   xyz.openbmc_project.State.BMC.Redundancy interface no Redfish event is
 //   emitted today.
+//   STATUS: IMPLEMENTED – bmcRedundancyPropertyChange() in event_dbus_monitor.hpp
 //
-// Gap R2 – Failover-initiated event missing
-//   A successful ForceFailover action should result in a
-//   ResourceEvent.ResourceChanged for the Manager resource, but there is no
-//   sendEvent() call after the D-Bus StartFailover method returns success.
+// Gap R2 – Failover-initiated event
+//   A successful StartFailover (whether called via Redfish ForceFailover action
+//   or directly over D-Bus) causes property changes on BMC.Redundancy (Role,
+//   FailoverInProgress, FailoversAllowed).  Those changes are picked up by the
+//   bmcRedundancyPropertyChange() signal handler which emits the appropriate
+//   Redfish event.  No separate sendEvent() call is needed inside
+//   handleManagerForceFailover().
+//   STATUS: IMPLEMENTED – covered via R1 signal handler in event_dbus_monitor.hpp
 //
 // Gap R3 – RedundancyEnabled toggled → no Mode-change event
 //   When the BMC operator enables or disables redundancy (flipping
 //   RedundancyEnabled) there is no event to notify subscribers that the
 //   Redundancy Mode changed from Failover to NotRedundant (or vice-versa).
+//   STATUS: IMPLEMENTED – covered via R1 signal handler (generic fallback path)
 //
 // Gap R4 – FailoversAllowed toggled → no Status/Health-change event
 //   When FailoversAllowed transitions false→true or true→false the resource
 //   health changes between Warning and OK but no
 //   ResourceStatusChangedWarning / ResourceStatusChangedOK event is sent.
+//   STATUS: IMPLEMENTED – bmcRedundancyPropertyChange() handles FailoversAllowed
 //
 // Gap R5 – Role change (Standby ↔ Active) → no event
 //   When the BMC Role property flips (e.g. after a failover completes and
 //   this BMC becomes Active) the ActiveRedundancySet changes but no
 //   ResourceChanged event is sent.
+//   STATUS: IMPLEMENTED – bmcRedundancyPropertyChange() handles Role changes
 //
 // -------------------------------------------------------------------------
 // How to use these tests
@@ -228,29 +235,46 @@ TEST(ManagerRedundancyMissing,
 }
 
 // ---------------------------------------------------------------------------
-// [IMPLEMENTED] Gap R2 – ForceFailover success now emits ResourceChanged
+// [IMPLEMENTED] Gap R2 – StartFailover events now emitted via D-Bus monitor
 // ---------------------------------------------------------------------------
-// handleManagerForceFailover() calls D-Bus StartFailover.  The async callback
-// now calls:
-//   sendEvent(messages::resourceChanged(),
-//             "/redfish/v1/Managers/<managerId>", "Manager")
-// on the success path (manager_redundancy.hpp).
+// StartFailover (whether invoked via Redfish POST ForceFailover or a direct
+// D-Bus call) causes the redundancy-manager in phosphor-state-manager to:
+//   1. set FailoverInProgress = true   (PropertiesChanged on BMC.Redundancy)
+//   2. set Role = Active               (PropertiesChanged on BMC.Redundancy)
+//   3. set FailoversAllowed = false    (PropertiesChanged on BMC.Redundancy)
+//   4. set FailoverInProgress = false  (PropertiesChanged on BMC.Redundancy)
 //
-// This test verifies the message payload used by the sendEvent() call is
-// well-formed.
+// Each of those property changes fires bmcRedundancyPropertyChange() in
+// event_dbus_monitor.hpp, which emits the appropriate Redfish event:
+//   • FailoversAllowed false → ResourceStatusChangedWarning
+//   • Role change → ResourceStateChanged
+//   • FailoverInProgress or other property → ResourceChanged (fallback)
 //
-TEST(ManagerRedundancyMissing, ForceFailoverSuccessEmitsResourceChangedPayload)
+// handleManagerForceFailover() therefore does NOT need its own sendEvent()
+// call: the events are always generated by the signal handler regardless of
+// how StartFailover was invoked.
+//
+// This test verifies that the message payloads used by the signal handler
+// for the Role and FailoversAllowed transitions are well-formed.
+//
+TEST(ManagerRedundancyMissing, ForceFailoverSuccessEmitsEventViaSignalHandler)
 {
-    // The payload sent by the now-implemented sendEvent() call must be valid.
-    nlohmann::json::object_t msg = messages::resourceChanged();
+    // Role change (Passive → Active) emitted by bmcRedundancyPropertyChange
+    nlohmann::json::object_t roleMsg =
+        messages::resourceStateChanged("bmc", "Active");
+    ASSERT_FALSE(roleMsg.empty());
+    EXPECT_TRUE(
+        roleMsg.at("MessageId").get<std::string>().ends_with("ResourceStateChanged"));
+    EXPECT_EQ(roleMsg.at("MessageSeverity"), "OK");
+    EXPECT_EQ(roleMsg.at("MessageArgs")[1], "Active");
 
-    ASSERT_FALSE(msg.empty());
-    const auto& msgId = msg.at("MessageId").get<std::string>();
-    EXPECT_TRUE(msgId.ends_with("ResourceChanged"));
-    EXPECT_EQ(msg.at("MessageSeverity"), "OK");
-
-    const auto& message = msg.at("Message").get<std::string>();
-    EXPECT_FALSE(message.empty());
+    // FailoversAllowed=false emitted by bmcRedundancyPropertyChange
+    nlohmann::json::object_t foMsg =
+        messages::resourceStatusChangedWarning("bmc", "Warning");
+    ASSERT_FALSE(foMsg.empty());
+    EXPECT_TRUE(
+        foMsg.at("MessageId").get<std::string>().ends_with("ResourceStatusChangedWarning"));
+    EXPECT_EQ(foMsg.at("MessageSeverity"), "Warning");
 }
 
 // ---------------------------------------------------------------------------

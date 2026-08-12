@@ -18,21 +18,22 @@
 //
 // What IS tested as placeholder (skipped – STEP C implementation needed):
 //   - End-to-end: D-Bus BMC.Redundancy PropertiesChanged → sendEvent()
-//   - End-to-end: ForceFailover success → sendEvent()
+//   - End-to-end: StartFailover property changes → sendEvent() via signal handler
 //   - End-to-end: FailoversAllowed false → sendEvent(StatusChangedWarning)
 //   - End-to-end: FailoversAllowed true  → sendEvent(StatusChangedOK)
 //   - End-to-end: Role change → sendEvent(ResourceChanged)
 //   - End-to-end: Sibling BMC InterfacesAdded/Removed → sendEvent()
 //
-// Implementation Strategy (STEP C):
+// Implementation Status (STEP C – COMPLETED for R1-R5):
 //   In event_dbus_monitor.hpp:
-//     1. Add matchBMCRedundancyChange (shared_ptr<sdbusplus::bus::match>)
-//     2. Add bmcRedundancyPropertyChange() signal handler
-//     3. Add registerBMCRedundancyChangeSignal() registration function
-//     4. Call registerBMCRedundancyChangeSignal() from registerStateChangeSignal()
+//     1. matchBMCRedundancyChange (shared_ptr<sdbusplus::bus::match>) – DONE
+//     2. bmcRedundancyPropertyChange() signal handler – DONE
+//     3. registerBMCRedundancyChangeSignal() registration function – DONE
+//     4. Called from registerStateChangeSignal() – DONE
 //   In manager_redundancy.hpp:
-//     5. Add sendEvent(messages::resourceChanged(),...) in
-//        handleManagerForceFailover() success branch
+//     5. No sendEvent() needed in handleManagerForceFailover(): StartFailover
+//        causes BMC.Redundancy property changes (Role, FailoverInProgress,
+//        FailoversAllowed) which fire bmcRedundancyPropertyChange() – DONE
 
 #include "event_matches_filter.hpp"
 #include "event_service_manager.hpp"
@@ -259,10 +260,13 @@ TEST(ManagerRedundancyIntegrationPlaceholder,
 }
 
 // ---------------------------------------------------------------------------
-// Test 11 [IMPLEMENTED]: ForceFailover success message payload is valid
+// Test 11 [IMPLEMENTED]: StartFailover property-change events routed correctly
 // ---------------------------------------------------------------------------
-// handleManagerForceFailover() now calls sendEvent(messages::resourceChanged(),
-// "/redfish/v1/Managers/<managerId>", "Manager") on the success path.
+// StartFailover causes BMC.Redundancy property changes (Role, FailoverInProgress,
+// FailoversAllowed) which fire bmcRedundancyPropertyChange() in
+// event_dbus_monitor.hpp.  The fallback path of that handler emits
+// ResourceChanged for unrecognised properties (e.g. FailoverInProgress).
+// Verify that payload is routed to Manager subscribers.
 //
 TEST(ManagerRedundancyIntegrationPlaceholder,
      ForceFailoverSuccessEmitsResourceChangedEvent)
