@@ -10,15 +10,18 @@
 #include "logging.hpp"
 #include "routing.hpp"
 #include "routing/dynamicrule.hpp"
+#include "ssl_key_handler.hpp"
 #include "str_utility.hpp"
 
 #include <sys/socket.h>
 #include <systemd/sd-daemon.h>
 
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/ssl/context.hpp>
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>

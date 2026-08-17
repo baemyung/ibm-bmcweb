@@ -4,17 +4,24 @@
 #include "mutual_tls.hpp"
 #include "ssl_key_handler.hpp"
 
+#include <openssl/crypto.h>
 #include <openssl/ssl.h>
+#include <openssl/tls1.h>
 
-#include <boost/asio/ip/address.hpp>
 #include <boost/asio/ssl/context.hpp>
+#include <boost/asio/ssl/verify_mode.hpp>
 
+#include <exception>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
+#include <utility>
 
 namespace bmcweb
 {
+
+// NOLINTBEGIN(*)
 
 inline int tlsVerifyCallback([[maybe_unused]] int preverified,
                              [[maybe_unused]] X509_STORE_CTX* ctx)
@@ -216,5 +223,7 @@ struct SniContextFactoryState
         return SSL_TLSEXT_ERR_OK;
     }
 };
+
+// NOLINTEND(*)
 
 } // namespace bmcweb

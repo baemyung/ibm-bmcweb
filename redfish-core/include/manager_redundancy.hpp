@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: Copyright OpenBMC Authors
 #pragma once
 
+#include "bmcweb_config.h"
+
 #include "app.hpp"
 #include "async_resp.hpp"
 #include "dbus_singleton.hpp"
@@ -9,15 +11,23 @@
 #include "error_messages.hpp"
 #include "generated/enums/redundancy.hpp"
 #include "generated/enums/resource.hpp"
+#include "http_request.hpp"
 #include "logging.hpp"
 #include "query.hpp"
+#include "utility.hpp"
 #include "utils/dbus_utils.hpp"
+#include "utils/json_utils.hpp"
 
 #include <asm-generic/errno.h>
+#include <systemd/sd-bus.h>
 
 #include <boost/system/error_code.hpp>
+#include <boost/system/result.hpp>
 #include <boost/url/format.hpp>
+#include <boost/url/parse.hpp>
+#include <boost/url/url.hpp>
 #include <nlohmann/json.hpp>
+#include <sdbusplus/message.hpp>
 #include <sdbusplus/message/native_types.hpp>
 #include <sdbusplus/unpack_properties.hpp>
 
@@ -32,6 +42,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 
 namespace redfish
 {

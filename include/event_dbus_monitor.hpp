@@ -11,6 +11,7 @@
 #include <sdbusplus/message.hpp>
 #include <sdbusplus/message/native_types.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <map>

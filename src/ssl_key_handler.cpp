@@ -16,6 +16,8 @@
 #include <boost/beast/core/file_posix.hpp>
 #include <boost/system/error_code.hpp>
 
+#include <cstdint>
+
 extern "C"
 {
 #include <nghttp2/nghttp2.h>

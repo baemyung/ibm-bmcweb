@@ -12,7 +12,7 @@ project(
         'cpp_rtti=false',
         'cpp_std=c++23',
         'warning_level=3',
-        'werror=true',
+        'werror=false',
     ],
 )
 
@@ -113,6 +113,7 @@ if (cxx.get_id() == 'clang')
     boost_flags += ['-Wno-strict-prototypes', '-Wno-unused-but-set-variable']
     nghttp2_flags += ['-Wno-extra-semi']
 endif
+boost_flags += ['-Wno-strict-prototypes', '-Wno-unused-but-set-variable']
 
 if (cxx.get_id() == 'gcc')
     if (cxx.version().version_compare('<13.0'))

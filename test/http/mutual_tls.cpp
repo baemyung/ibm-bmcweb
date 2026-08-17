@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <initializer_list>
 #include <string>
 #include <string_view>

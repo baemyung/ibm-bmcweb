@@ -17,6 +17,7 @@
 #include "registries/privilege_registry.hpp"
 #include "utils/assembly_utils.hpp"
 #include "utils/asset_utils.hpp"
+#include "utils/dbus_utils.hpp"
 #include "utils/json_utils.hpp"
 #include "utils/name_utils.hpp"
 
@@ -29,6 +30,7 @@
 #include <nlohmann/json.hpp>
 #include <sdbusplus/asio/property.hpp>
 
+#include <array>
 #include <cstddef>
 #include <functional>
 #include <map>

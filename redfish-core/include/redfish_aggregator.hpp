@@ -16,6 +16,7 @@
 #include "utility.hpp"
 
 #include <boost/beast/http/field.hpp>
+#include <boost/beast/http/fields.hpp>
 #include <boost/beast/http/status.hpp>
 #include <boost/beast/http/verb.hpp>
 #include <boost/system/errc.hpp>
@@ -40,7 +41,6 @@
 #include <ranges>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <unordered_map>
 #include <utility>
 #include <variant>
