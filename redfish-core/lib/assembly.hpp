@@ -19,6 +19,7 @@
 #include "utils/asset_utils.hpp"
 #include "utils/json_utils.hpp"
 #include "utils/name_utils.hpp"
+#include "utils/resource_utils.hpp"
 
 #include <asm-generic/errno.h>
 
@@ -77,39 +78,30 @@ inline void getAssemblyLocationCode(
         });
 }
 
-inline void getAssemblyState(
+inline void getAssemblyReadyToRemove(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
     const auto& serviceName, const auto& assembly,
     const nlohmann::json::json_pointer& assemblyJsonPtr)
 {
-    asyncResp->res.jsonValue[assemblyJsonPtr]["Status"]["State"] =
-        resource::State::Enabled;
-
-    dbus::utility::getProperty<bool>(
-        serviceName, assembly, "xyz.openbmc_project.Inventory.Item", "Present",
-        [asyncResp, assemblyJsonPtr,
-         assembly](const boost::system::error_code& ec, const bool value) {
-            if (ec)
-            {
-                if (ec.value() != EBADR)
+    std::string fru = sdbusplus::message::object_path(assembly).filename();
+    if (fru == "panel0" || fru == "panel1")
+    {
+        dbus::utility::getProperty<bool>(
+            serviceName, assembly, "xyz.openbmc_project.Inventory.Item",
+            "Present",
+            [asyncResp, assemblyJsonPtr,
+             assembly](const boost::system::error_code& ec, const bool value) {
+                if (ec)
                 {
-                    BMCWEB_LOG_ERROR("DBUS response error: {}", ec.value());
-                    messages::internalError(asyncResp->res);
+                    if (ec.value() != EBADR)
+                    {
+                        BMCWEB_LOG_ERROR("DBUS response error: {}", ec.value());
+                        messages::internalError(asyncResp->res);
+                    }
+                    return;
                 }
-                return;
-            }
 
-            if (!value)
-            {
-                asyncResp->res.jsonValue[assemblyJsonPtr]["Status"]["State"] =
-                    resource::State::Absent;
-            }
-
-            std::string fru =
-                sdbusplus::message::object_path(assembly).filename();
-            // Special handling for LCD and base panel CM.
-            if (fru == "panel0" || fru == "panel1")
-            {
+                // Special handling for LCD and base panel CM.
                 asyncResp->res.jsonValue[assemblyJsonPtr]["Oem"]["OpenBMC"]
                                         ["@odata.type"] =
                     "#OpenBMCAssembly.v1_0_0.OpenBMC";
@@ -118,38 +110,8 @@ inline void getAssemblyState(
                 // can be placed.
                 asyncResp->res.jsonValue[assemblyJsonPtr]["Oem"]["OpenBMC"]
                                         ["ReadyToRemove"] = !value;
-            }
-        });
-}
-
-void getAssemblyHealth(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-                       const auto& serviceName, const auto& assembly,
-                       const nlohmann::json::json_pointer& assemblyJsonPtr)
-{
-    asyncResp->res.jsonValue[assemblyJsonPtr]["Status"]["Health"] =
-        resource::Health::OK;
-
-    dbus::utility::getProperty<bool>(
-        serviceName, assembly,
-        "xyz.openbmc_project.State.Decorator.OperationalStatus", "Functional",
-        [asyncResp, assemblyJsonPtr](const boost::system::error_code& ec,
-                                     bool functional) {
-            if (ec)
-            {
-                if (ec.value() != EBADR)
-                {
-                    BMCWEB_LOG_ERROR("DBUS response error {}", ec.value());
-                    messages::internalError(asyncResp->res);
-                }
-                return;
-            }
-
-            if (!functional)
-            {
-                asyncResp->res.jsonValue[assemblyJsonPtr]["Status"]["Health"] =
-                    resource::Health::Critical;
-            }
-        });
+            });
+    }
 }
 
 /**
@@ -261,14 +223,17 @@ inline void afterGetDbusObject(
             }
             else if (interface == "xyz.openbmc_project.Inventory.Item")
             {
-                getAssemblyState(asyncResp, serviceName, assembly,
-                                 assemblyJsonPtr);
+                resource_utils::getResourceState(asyncResp, serviceName,
+                                                 assembly, assemblyJsonPtr);
+
+                getAssemblyReadyToRemove(asyncResp, serviceName, assembly,
+                                         assemblyJsonPtr);
             }
             else if (interface ==
                      "xyz.openbmc_project.State.Decorator.OperationalStatus")
             {
-                getAssemblyHealth(asyncResp, serviceName, assembly,
-                                  assemblyJsonPtr);
+                resource_utils::getResourceHealth(asyncResp, serviceName,
+                                                  assembly, assemblyJsonPtr);
             }
             else if (interface == "xyz.openbmc_project.State.ReadyToRemove")
             {

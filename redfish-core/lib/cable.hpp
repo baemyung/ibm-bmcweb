@@ -18,6 +18,7 @@
 #include "utils/chassis_utils.hpp"
 #include "utils/collection.hpp"
 #include "utils/dbus_utils.hpp"
+#include "utils/resource_utils.hpp"
 
 #include <asm-generic/errno.h>
 #include <sys/types.h>
@@ -156,35 +157,6 @@ inline void fillCablePartNumber(
                 return;
             }
             asyncResp->res.jsonValue["PartNumber"] = property;
-        });
-}
-
-inline void fillCableHealthState(
-    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-    const std::string& cableObjectPath, const std::string& service)
-{
-    dbus::utility::getProperty<bool>(
-        *crow::connections::systemBus, service, cableObjectPath,
-        "xyz.openbmc_project.Inventory.Item", "Present",
-        [asyncResp,
-         cableObjectPath](const boost::system::error_code& ec, bool present) {
-            if (ec)
-            {
-                if (ec.value() != EBADR)
-                {
-                    BMCWEB_LOG_ERROR(
-                        "get presence failed for Cable {} with error {}",
-                        cableObjectPath, ec.value());
-                    messages::internalError(asyncResp->res);
-                }
-                return;
-            }
-
-            if (!present)
-            {
-                asyncResp->res.jsonValue["Status"]["State"] =
-                    resource::State::Absent;
-            }
         });
 }
 
@@ -490,7 +462,14 @@ inline void getCableProperties(
             }
             else if (interface == "xyz.openbmc_project.Inventory.Item")
             {
-                fillCableHealthState(asyncResp, cableObjectPath, service);
+                resource_utils::getResourceState(
+                    asyncResp, service, cableObjectPath, ""_json_pointer);
+            }
+            else if (interface ==
+                     "xyz.openbmc_project.State.Decorator.OperationalStatus")
+            {
+                resource_utils::getResourceHealth(
+                    asyncResp, service, cableObjectPath, ""_json_pointer);
             }
             else if (interface ==
                      "xyz.openbmc_project.Inventory.Decorator.Asset")
