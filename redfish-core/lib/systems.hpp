@@ -2305,6 +2305,84 @@ inline void getChapData(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
 }
 
 /*
+ * Get StorageParent
+ */
+inline void getStorageParent(
+    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
+{
+    BMCWEB_LOG_DEBUG("Get StorageParent");
+    constexpr std::array<std::string_view, 1> interfaces = {
+        "com.ibm.VPD.StorageSystem"};
+    dbus::utility::getSubTree(
+        "/", 0, interfaces,
+        [asyncResp](const boost::system::error_code& ec,
+                    const dbus::utility::MapperGetSubTreeResponse& subtree) {
+            if (ec || subtree.empty())
+            {
+                // StorageParent is optional. Ignore all errors.
+                BMCWEB_LOG_DEBUG("StorageSystem GetSubTree: ec={}, count={}",
+                                 ec.value(), subtree.size());
+                return;
+            }
+
+            const std::string& path = subtree[0].first;
+            if (path.empty() || subtree[0].second.empty())
+            {
+                BMCWEB_LOG_DEBUG("StorageSystem mapper error!");
+                return;
+            }
+            const std::string& service = subtree[0].second.begin()->first;
+
+            dbus::utility::getAllProperties(
+                *crow::connections::systemBus, service, path,
+                "com.ibm.VPD.StorageSystem",
+                [asyncResp](
+                    const boost::system::error_code& ec2,
+                    const dbus::utility::DBusPropertiesMap& propertiesList) {
+                    if (ec2)
+                    {
+                        BMCWEB_LOG_DEBUG("Get StorageSystem D-bus error: {}",
+                                         ec2.value());
+                        return;
+                    }
+
+                    const std::string* model = nullptr;
+                    const std::string* serialNumber = nullptr;
+                    const std::string* systemId = nullptr;
+                    const std::string* nodeId = nullptr;
+                    const std::string* manufacturingId = nullptr;
+                    const bool success = sdbusplus::unpackPropertiesNoThrow(
+                        dbus_utils::UnpackErrorPrinter(), propertiesList,
+                        "StorageParentModel", model,
+                        "StorageParentSerialNumber", serialNumber,
+                        "StorageParentSystemId", systemId,
+                        "StorageParentNodeId", nodeId,
+                        "StorageParentManufacturingId", manufacturingId);
+
+                    if (!success)
+                    {
+                        messages::internalError(asyncResp->res);
+                        return;
+                    }
+
+                    nlohmann::json& oemIBM =
+                        asyncResp->res.jsonValue["Oem"]["IBM"];
+                    oemIBM["@odata.type"] = "#IBMComputerSystem.v1_0_0.IBM";
+
+                    nlohmann::json& storageParent = oemIBM["StorageParent"];
+                    storageParent["@odata.type"] =
+                        "#IBMComputerSystem.v1_0_0.StorageParent";
+                    storageParent["StorageParentModel"] = *model;
+                    storageParent["StorageParentSerialNumber"] = *serialNumber;
+                    storageParent["StorageParentSystemId"] = *systemId;
+                    storageParent["StorageParentNodeId"] = *nodeId;
+                    storageParent["StorageParentManufacturingId"] =
+                        *manufacturingId;
+                });
+        });
+}
+
+/*
  * Set ChapData
  */
 inline void setChapData(const crow::Request& req,
@@ -2842,6 +2920,9 @@ inline void handleComputerSystemGet(
 
     // ChapData
     getChapData(asyncResp);
+
+    // StorageParent
+    getStorageParent(asyncResp);
 }
 
 inline void handleComputerSystemPatch(

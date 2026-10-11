@@ -90,6 +90,11 @@
           <Annotation Term="OData.Description" String="ChapData details to Host."/>
           <Annotation Term="OData.LongDescription" String="This property shall contain ChapData."/>
         </Property>
+        <Property Name="StorageParent" Type="IBMComputerSystem.v1_0_0.StorageParent">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="StorageParent details of the storage system."/>
+          <Annotation Term="OData.LongDescription" String="This property shall contain StorageParent."/>
+        </Property>
       </ComplexType>
       <ComplexType Name="ChapData" BaseType="Resource.OemObject">
         <Annotation Term="OData.AdditionalProperties" Bool="false"/>
@@ -104,6 +109,36 @@
           <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
           <Annotation Term="OData.Description" String="An encrypted secret password transferred to the Host for the respective ChapName."/>
           <Annotation Term="OData.LongDescription" String="This property shall contain ChapSecret that is an encrypted secret password transferred to the Host for the respective ChapName."/>
+        </Property>
+      </ComplexType>
+      <ComplexType Name="StorageParent" BaseType="Resource.OemObject">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Annotation Term="OData.Description" String="StorageParent details of the storage system."/>
+        <Annotation Term="OData.LongDescription" String="This type shall contain StorageParent."/>
+        <Property Name="StorageParentModel" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The machine type and model of the storage parent."/>
+          <Annotation Term="OData.LongDescription" String="This property shall contain the machine type and model of the storage parent."/>
+        </Property>
+        <Property Name="StorageParentSerialNumber" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The serial number of the storage parent."/>
+          <Annotation Term="OData.LongDescription" String="This property shall contain the serial number of the storage parent."/>
+        </Property>
+        <Property Name="StorageParentSystemId" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The system identifier of the storage parent."/>
+          <Annotation Term="OData.LongDescription" String="This property shall contain the system identifier of the storage parent."/>
+        </Property>
+        <Property Name="StorageParentNodeId" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The node identifier of the storage parent."/>
+          <Annotation Term="OData.LongDescription" String="This property shall contain the node identifier of the storage parent."/>
+        </Property>
+        <Property Name="StorageParentManufacturingId" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The manufacturing identifier of the storage parent."/>
+          <Annotation Term="OData.LongDescription" String="This property shall contain the manufacturing identifier of the storage parent."/>
         </Property>
       </ComplexType>
     </Schema>

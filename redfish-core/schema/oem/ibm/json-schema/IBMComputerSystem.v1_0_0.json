@@ -99,6 +99,11 @@
                     "description": "ChapData.",
                     "longDescription": "This property shall describe ChapData."
                 },
+                "StorageParent": {
+                    "$ref": "#/definitions/StorageParent",
+                    "description": "StorageParent.",
+                    "longDescription": "This property shall describe StorageParent."
+                },
                 "SafeMode": {
                     "description": "An indication of whether safe mode is active.",
                     "longDescription": "The value of this property shall indicate if safe mode is active.",
@@ -136,6 +141,58 @@
                 "ChapSecret": {
                     "description": "An encrypted secret password transferred to the Host for the respective ChapName.",
                     "longDescription": "This property shall contain ChapSecret that is an encrypted secret password transferred to the Host for the respective ChapName.",
+                    "type": ["string", "null"]
+                }
+            },
+            "type": "object"
+        },
+        "StorageParent": {
+            "additionalProperties": false,
+            "description": "StorageParent details of the storage system.",
+            "longDescription": "This type shall contain properties that describe StorageParent.",
+            "patternProperties": {
+                "^([a-zA-Z_][a-zA-Z0-9_]*)?@(odata|Redfish|Message)\\.[a-zA-Z_][a-zA-Z0-9_]*$": {
+                    "description": "This property shall specify a valid odata or Redfish property.",
+                    "type": [
+                        "array",
+                        "boolean",
+                        "integer",
+                        "number",
+                        "null",
+                        "object",
+                        "string"
+                    ]
+                }
+            },
+            "properties": {
+                "StorageParentModel": {
+                    "description": "The machine type and model of the storage parent.",
+                    "longDescription": "This property shall contain the machine type and model of the storage parent.",
+                    "readonly": true,
+                    "type": ["string", "null"]
+                },
+                "StorageParentSerialNumber": {
+                    "description": "The serial number of the storage parent.",
+                    "longDescription": "This property shall contain the serial number of the storage parent.",
+                    "readonly": true,
+                    "type": ["string", "null"]
+                },
+                "StorageParentSystemId": {
+                    "description": "The system identifier of the storage parent.",
+                    "longDescription": "This property shall contain the system identifier of the storage parent.",
+                    "readonly": true,
+                    "type": ["string", "null"]
+                },
+                "StorageParentNodeId": {
+                    "description": "The node identifier of the storage parent.",
+                    "longDescription": "This property shall contain the node identifier of the storage parent.",
+                    "readonly": true,
+                    "type": ["string", "null"]
+                },
+                "StorageParentManufacturingId": {
+                    "description": "The manufacturing identifier of the storage parent.",
+                    "longDescription": "This property shall contain the manufacturing identifier of the storage parent.",
+                    "readonly": true,
                     "type": ["string", "null"]
                 }
             },
