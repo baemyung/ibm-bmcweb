@@ -2304,6 +2304,8 @@ inline void getChapData(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
         });
 }
 
+static constexpr bool mockupStorageVPDUsed = true;
+
 /*
  * Get StorageParent
  */
@@ -2315,11 +2317,14 @@ inline void getStorageVPD(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
         "/xyz/openbmc_project/inventory/system", "com.ibm.VPD.StorageSystem",
         [asyncResp](const boost::system::error_code& ec,
                     const dbus::utility::DBusPropertiesMap& propertiesList) {
-            if (ec)
+            if constexpr (!mockupStorageVPDUsed)
             {
-                BMCWEB_LOG_DEBUG("Get StorageSystem D-bus error: {}",
-                                 ec.value());
-                return;
+                if (ec)
+                {
+                    BMCWEB_LOG_DEBUG("Get StorageSystem D-bus error: {}",
+                                     ec.value());
+                    return;
+                }
             }
 
             const std::string* model = nullptr;
@@ -2328,16 +2333,32 @@ inline void getStorageVPD(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
             const std::string* nodeId = nullptr;
             const std::string* manufacturingId = nullptr;
 
-            const bool success = sdbusplus::unpackPropertiesNoThrow(
-                dbus_utils::UnpackErrorPrinter(), propertiesList,
-                "StorageParentModel", model, "StorageParentSerialNumber",
-                serialNumber, "StorageParentSystemId", systemId,
-                "StorageParentNodeId", nodeId, "StorageParentManufacturingId",
-                manufacturingId);
-            if (!success)
+            if constexpr (mockupStorageVPDUsed)
             {
-                messages::internalError(asyncResp->res);
-                return;
+                static std::string modelMockup = "2107-A08";
+                static std::string serialNumberMockup = "75MKC70";
+                static std::string systemIdMockup = "00";
+                static std::string nodeIdMockup = "500507630BFFEA99";
+                static std::string manufacturingIdMockup = "1402023";
+                model = &modelMockup;
+                serialNumber = &serialNumberMockup;
+                systemId = &systemIdMockup;
+                nodeId = &nodeIdMockup;
+                manufacturingId = &manufacturingIdMockup;
+            }
+            else
+            {
+                const bool success = sdbusplus::unpackPropertiesNoThrow(
+                    dbus_utils::UnpackErrorPrinter(), propertiesList,
+                    "StorageParentModel", model, "StorageParentSerialNumber",
+                    serialNumber, "StorageParentSystemId", systemId,
+                    "StorageParentNodeId", nodeId,
+                    "StorageParentManufacturingId", manufacturingId);
+                if (!success)
+                {
+                    messages::internalError(asyncResp->res);
+                    return;
+                }
             }
 
             nlohmann::json& oemIBM = asyncResp->res.jsonValue["Oem"]["IBM"];
