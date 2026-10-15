@@ -324,7 +324,8 @@ class ConfigFile
                 {"ResourceTypes", subValue->resourceTypes},
                 {"SendHeartbeat", subValue->sendHeartbeat},
                 {"SubscriptionType", subValue->subscriptionType},
-                {"VerifyCertificate", subValue->verifyCertificate},
+                {"CreatedTimestmap", subValue->createdTimestamp},
+                {"LastLoadedTimestamp", subValue->lastLoadedTimestamp},
             });
         }
         persistentFile << data;
@@ -464,6 +465,8 @@ class ConfigFile
             subscription["MetricReportDefinitions"] =
                 subValue.metricReportDefinitions;
             subscription["VerifyCertificate"] = subValue.verifyCertificate;
+            subscription["CreatedTimestmap"] = subValue.createdTimestamp;
+            subscription["LastLoadedTimestamp"] = subValue.lastLoadedTimestamp;
 
             subscriptions.emplace_back(std::move(subscription));
         }
