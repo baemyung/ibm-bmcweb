@@ -1505,8 +1505,7 @@ inline void triggerUnauthenticatedACFUpload(
         }
         try
         {
-            std::copy(sDecodedAcf.begin(), sDecodedAcf.end(),
-                      std::back_inserter(decodedAcf));
+            std::ranges::copy(sDecodedAcf, std::back_inserter(decodedAcf));
         }
         catch (const std::exception& e)
         {
@@ -2795,8 +2794,8 @@ inline void handleAccountPatch(
                     }
                     try
                     {
-                        std::copy(sDecodedAcf.begin(), sDecodedAcf.end(),
-                                  std::back_inserter(decodedAcf));
+                        std::ranges::copy(sDecodedAcf,
+                                          std::back_inserter(decodedAcf));
                     }
                     catch (const std::exception& e)
                     {
