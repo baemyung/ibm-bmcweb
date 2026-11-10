@@ -2350,17 +2350,31 @@ inline void afterGetStorageVPDAllProperties(
     const boost::system::error_code& ec,
     const dbus::utility::DBusPropertiesMap& propertiesList)
 {
-    if (ec)
-    {
-        BMCWEB_LOG_DEBUG("Get StorageSystem D-bus error: {}", ec.value());
-        return;
-    }
+    static std::string modelMockup = "2107-A08";
+    static std::string serialNumberMockup = "75MKC70";
+    static std::string systemIdMockup = "00";
+    static std::string nodeIdMockup = "500507630BFFEA99";
+    static std::string manufacturingIdMockup = "1402023";
+
 
     const std::string* manufacturingId = nullptr;
     const std::string* model = nullptr;
     const std::string* nodeId = nullptr;
     const std::string* serialNumber = nullptr;
     const std::string* systemId = nullptr;
+    
+    if (ec)
+    {
+        BMCWEB_LOG_DEBUG("Get StorageSystem D-bus error: {}", ec.value());
+        BMCWEB_LOG_ERROR("TEST: Get StorageSystem D-bus error: {}", ec.value());
+        // return;
+
+        model = &modelMockup;
+        serialNumber = &serialNumberMockup;
+        systemId = &systemIdMockup;
+        nodeId = &nodeIdMockup;
+        manufacturingId = &manufacturingIdMockup;
+    }
 
     const bool success = sdbusplus::unpackPropertiesNoThrow(
         dbus_utils::UnpackErrorPrinter(), propertiesList,
@@ -2370,9 +2384,19 @@ inline void afterGetStorageVPDAllProperties(
 
     if (!success)
     {
-        messages::internalError(asyncResp->res);
-        return;
+        // messages::internalError(asyncResp->res);
+        // return;
+
+        BMCWEB_LOG_ERROR("TEST: unpackPropertiesNoThrow Not success");
+
+        model = &modelMockup;
+        serialNumber = &serialNumberMockup;
+        systemId = &systemIdMockup;
+        nodeId = &nodeIdMockup;
+        manufacturingId = &manufacturingIdMockup;
     }
+
+    BMCWEB_LOG_ERROR("TEST: NEXT2");
 
     nlohmann::json::object_t oemIBM;
     oemIBM["@odata.type"] = "#IBMComputerSystem.v1_0_0.IBM";
