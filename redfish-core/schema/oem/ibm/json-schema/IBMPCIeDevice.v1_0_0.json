@@ -1,7 +1,7 @@
 {
     "$id": "http://redfish.dmtf.org/schemas/v1/IBMPCIeDevice.json",
     "$schema": "http://redfish.dmtf.org/schemas/v1/redfish-schema-v1.json",
-    "Copyright": "Copyright 2026 OpenBMC.",
+    "copyright": "Copyright 2026 IBM.",
     "definitions": {
         "Oem": {
             "additionalProperties": true,

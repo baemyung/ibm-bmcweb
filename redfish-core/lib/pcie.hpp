@@ -19,6 +19,7 @@
 #include "registries/privilege_registry.hpp"
 #include "utils/asset_utils.hpp"
 #include "utils/dbus_utils.hpp"
+#include "utils/json_utils.hpp"
 #include "utils/name_utils.hpp"
 #include "utils/pcie_util.hpp"
 #include "utils/processor_utils.hpp"
@@ -41,13 +42,11 @@
 #include <limits>
 #include <memory>
 #include <optional>
-#include <ranges>
 #include <string>
 #include <string_view>
 #include <system_error>
 #include <utility>
 #include <variant>
-#include <vector>
 
 namespace redfish
 {
