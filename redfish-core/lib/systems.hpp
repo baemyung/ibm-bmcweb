@@ -3509,26 +3509,26 @@ inline void handleComputerSystemGet(
 
 struct PatchParams
 {
-    std::optional<bool> locationIndicatorActive;
+    std::optional<uint64_t> ipsEnterTime;
+    std::optional<uint64_t> ipsExitTime;
     std::optional<std::string> assetTag;
     std::optional<std::string> powerRestorePolicy;
     std::optional<std::string> powerMode;
-    std::optional<bool> wdtEnable;
     std::optional<std::string> wdtTimeOutAction;
     std::optional<std::string> bootSource;
     std::optional<std::string> bootType;
     std::optional<std::string> bootEnable;
     std::optional<std::string> bootAutomaticRetry;
-    std::optional<uint32_t> bootAutomaticRetryAttempts;
-    std::optional<bool> bootTrustedModuleRequired;
     std::optional<std::string> stopBootOnFault;
-    std::optional<bool> ipsEnable;
-    std::optional<uint8_t> ipsEnterUtil;
-    std::optional<uint64_t> ipsEnterTime;
-    std::optional<uint8_t> ipsExitUtil;
-    std::optional<uint64_t> ipsExitTime;
     std::optional<std::string> chapName;
     std::optional<std::string> chapSecret;
+    std::optional<uint32_t> bootAutomaticRetryAttempts;
+    std::optional<bool> locationIndicatorActive;
+    std::optional<bool> wdtEnable;
+    std::optional<bool> bootTrustedModuleRequired;
+    std::optional<bool> ipsEnable;
+    std::optional<uint8_t> ipsEnterUtil;
+    std::optional<uint8_t> ipsExitUtil;
     std::optional<bool> pcieTopologyRefresh;
     std::optional<bool> savePCIeTopologyInfo;
 };
